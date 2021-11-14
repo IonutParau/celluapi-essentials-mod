@@ -1,2 +1,7 @@
-# celluapi-essentials-mod
-A mod built with CelLuAPI that adds quality of life improvements while maintaining compatibility with other mods.
+# Essentials
+Essentials is a mod made with CelLuAPI that makes it cool
+
+## Components
+
+Essentials is made of small parts called components.
+There are built-in components, like Toolbar, and custom components made by others.
