@@ -1,0 +1,425 @@
+local ids = {}
+
+local texp = "MoreCells/"
+if IsEssentials then
+  texp = "Essentials/" .. texp
+end
+
+local half_pi = math.pi / 2
+
+local function makeTex(pic)
+  local t = love.graphics.newImage(pic)
+  return {
+    tex = t,
+    size = {
+      w = t:getWidth(),
+      h = t:getHeight(),
+      w2 = t:getWidth()/2,
+      h2 = t:getHeight()/2,
+    }
+  }
+end
+
+local wireArm = makeTex(texp .. "wire/arm.png")
+local wireActive = makeTex(texp .. "wire/on.png")
+local pistonOn = makeTex(texp .. "piston/on.png")
+
+---@param dir number
+---@param amount number
+local function GetForward(dir, amount)
+  amount = amount or 1
+  dir = (dir % 4)
+  if dir == 0 then
+    return {
+      x = amount,
+      y = 0
+    }
+  elseif dir == 1 then
+    return {
+      x = 0,
+      y = amount
+    }
+  elseif dir == 2 then
+    return {
+      x = -amount,
+      y = 0
+    }
+  elseif dir == 3 then
+    return {
+      x = 0,
+      y = -amount
+    }
+  end
+end
+
+local function isMech(id)
+  local l = getCellLabelById(id) or id
+
+  local suffix = "EMC mech "
+
+  return (l:sub(1, #suffix) == suffix)
+end
+
+local function isGate(id)
+  local l = getCellLabelById(id) or id
+
+  local suffix = "EMC gate "
+
+  return (l:sub(1, #suffix) == suffix)
+end
+
+local function isConnectable(id)
+  return isMech(id) or isGate(id)
+end
+
+local function isMechOn(x, y)
+  if not isMech(cells[y][x].ctype) then return false end
+  local s = cells[y][x].mech_signal
+  if s == nil then s = 0 end
+
+  return s > 0
+end
+
+function SignalMechanical(x, y, blockdir, forced)
+  if not isMech(cells[y][x].ctype) then return end
+
+  if forced == nil then
+    forced = true
+  end
+
+  cells[y][x].mech_signal = 2 -- OMG he powered
+
+  for i=0,3 do
+    if i ~= blockdir then
+      local off = GetForward(i)
+      local ox, oy = x + off.x, y + off.y
+      local canSpread = true
+      if not forced then
+        canSpread = (cells[y][x].ctype == ids.wire)
+      end
+      if isMech(cells[oy][ox].ctype) and canSpread and not isMechOn(ox, oy) then
+        SignalMechanical(ox, oy, nil, false)
+      end
+    end
+  end
+end
+
+local function DoMotionSensor(x, y, dir)
+  local off = GetForward(dir)
+
+  local ox, oy = x + off.x, y + off.y
+  
+  if not cells[y][x].motion_past_cell then
+    cells[y][x].motion_past_cell = CopyTable(cells[oy][ox])
+    return
+  end
+  local past = cells[y][x].motion_past_cell
+  local now = cells[oy][ox]
+
+  if past.ctype ~= now.ctype or past.rot ~= now.rot then
+    cells[y][x].motion_past_cell = CopyTable(cells[oy][ox])
+    SignalMechanical(x, y)
+  end
+end
+
+local function DoActivator(x, y)
+  if not isMechOn(x, y) then
+    for dir=0,3 do
+      local off = GetForward(dir)
+      local ox, oy = x + off.x, y + off.y
+      local id = cells[oy][ox].ctype
+
+      if id ~= ids.wire and id ~= ids.motionSensor and id ~= ids.mech_gen then
+        cells[oy][ox].updated = true
+      end
+    end
+  end
+end
+
+local function DoDelayer(x, y)
+  if isMechOn(x, y) then
+    SignalMechanical(x, y)
+    cells[y][x].mech_signal = 0
+  end
+end
+
+---@param type "\"and\""|"\"or\""|"\"xor\""|"\"nand\""|"\"nor\""|"\"xnor\""|"\"not\""
+local function DoLogicGate(x, y, dir, type)
+  if type == "not" then
+    local frontOff = GetForward(dir)
+    local backOff = GetForward(dir+2)
+
+    if isMech(cells[y+frontOff.y][x+frontOff.x].ctype) then
+      if not isMechOn(x+backOff.x, y+backOff.y) then
+        SignalMechanical(x+frontOff.x, y+frontOff.y)
+      end
+    end
+  else
+    local loff = GetForward(dir-1)
+    local roff = GetForward(dir+1)
+    local ooff = GetForward(dir)
+
+    local lx, ly, rx, ry, ox, oy = loff.x + x, loff.y + y, roff.x + x, roff.y + y, ooff.x + x, ooff.y + y
+
+    -- cells[ry][rx].ctype = 40
+    -- cells[ly][lx].ctype = 40
+    -- cells[oy][ox].ctype = 40
+
+    local d1, d2 = isMechOn(lx, ly) == true, isMechOn(rx, ry) == true
+
+    local p = function()
+      SignalMechanical(ox, oy, (dir+2)%4)
+    end
+
+    if type == "and" and (d1 and d2) then
+      p()
+    elseif type == "or" and (d1 or d2) then
+      p()
+    elseif type == "xor" and (d1 ~= d2) then
+      p()
+    elseif type == "nand" and not (d1 and d2) then
+      p()
+    elseif type == "nor" and not (d1 or d2) then
+      p()
+    elseif type == "xnor" and (d1 == d2) then
+      p()
+    end
+  end
+end
+
+local function slideCallback(x, y, dir)
+  return dir % 2 ~= cells[y][x].rot % 2
+end
+
+local function giveSubtick(id, updateFunc, static)
+  table.insert(subticks, GenerateSubtick(id, updateFunc, not (static or false)))
+end
+
+local function canPush(fx, fy, dir)
+  -- Straight up immovable
+  if cells[fy][fx].ctype == 40 or cells[fy][fx].ctype == -1 then
+    return false
+  elseif cells[fy][fx].ctype == 4 then -- Slider
+    return (cells[fy][fx].rot % 2 == dir % 2)
+  elseif cells[fy][fx].ctype == 5 or cells[fy][fx].ctype == 51 then -- 1 directional or opposition
+    return (cells[fy][fx].rot == dir)
+  elseif cells[fy][fx].ctype == 6 or cells[fy][fx].ctype == 52 then -- 2 directional or cross opposition
+    return (cells[fy][fx].rot == dir or cells[fy][fx].rot == (dir+1)%4)
+  elseif cells[fy][fx].ctype == 7 then -- 3 directional
+    return (cells[fy][fx].rot == dir or cells[fy][fx].rot == (dir-1)%4 or cells[fy][fx].rot == (dir+1)%4)
+  elseif cells[fy][fx].ctype == 53 then -- Slide opposition
+    return (cells[fy][fx].rot ~= (dir+2)%4)
+  elseif cells[fy][fx].ctype == ids.trashMover then
+    return (cells[fy][fx].rot ~= dir)
+  end
+
+  return true
+end
+
+local function inGrid(x, y)
+  return x > 0 and x < width-1 and y > 0 and y < height-1
+end
+
+local function FakeMoveForward(x, y, dir, replacetype, replacerot)
+  replacetype = replacetype or 0
+  replacerot = replacerot or 0
+  local front = GetForward(dir)
+
+  local us = CopyTable(cells[y][x])
+
+  cells[y][x] = {
+    ctype = replacetype,
+    rot = replacerot
+  }
+
+  cells[y+front.y][x+front.x] = us
+  SetChunk(x+front.x, y+front.y, us.ctype)
+end
+
+local function DoTrashMover(x, y, dir)
+  local frontOff = GetForward(dir)
+
+  local fx, fy = x + frontOff.x, y + frontOff.y
+
+  if not inGrid(fx, fy) then
+    return
+  end
+
+  local frontPos = walkDivergedPath(x, y, fx, fy)
+
+  fx = frontPos.x
+  fy = frontPos.y
+
+  local front = cells[fy][fx]
+
+  if canPush(fx, fy, dir) then
+    local id = front.ctype
+    if id == ids.trashMover and front.rot == (dir + 2) % 4 and not subtick then
+      cells[y][x] = {
+        ctype = 0,
+        rot = 0,
+        lastvars = {x, y, 0}
+      }
+    end
+    if id ~= 0 then
+      cells[fy][fx] = {
+        ctype = 0,
+        rot = 0,
+        lastvars = {fx, fy, 0}
+      }
+      destroysound:play()
+    end
+    FakeMoveForward(x, y, dir)
+  end
+end
+
+local function init()
+  -- Gens
+  ids.motionSensor = addCell("EMC mech motion-sensor", texp .. "motionSensor.png", {updateindex = 1})
+  ids.wire = addCell("EMC mech wire", texp .. "wire/off.png", {updateindex = 2})
+  ids.mech_gen = addCell("EMC mech mech_gen", texp .. "mech_gen.png", {updateindex = 3})
+  -- Users
+  ids.activator = addCell("EMC mech activator", texp .. "activator.png", Options.neverupdate)
+  ids.piston = addCell("EMC mech piston", texp .. "piston/off.png", Options.neverupdate)
+
+  -- Add gates
+  ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
+  ids.g_or = addCell("EMC gate or", texp .. "gates/or.png", Options.neverupdate)
+  ids.g_xor = addCell("EMC gate xor", texp .. "gates/xor.png", Options.neverupdate)
+  ids.g_nand = addCell("EMC gate nand", texp .. "gates/nand.png", Options.neverupdate)
+  ids.g_nor = addCell("EMC gate nor", texp .. "gates/nor.png", Options.neverupdate)
+  ids.g_xnor = addCell("EMC gate xnor", texp .. "gates/xnor.png", Options.neverupdate)
+  ids.g_not = addCell("EMC gate not", texp .. "gates/not.png", Options.neverupdate)
+
+  table.insert(subticks, GenerateSubtick({ ids.g_and, ids.g_or, ids.g_xor, ids.g_nand, ids.g_nor, ids.g_xnor, ids.g_not }, DoModded, true))
+  table.insert(subticks, 4, GenerateSubtick(ids.activator, DoActivator, true))
+  giveSubtick(ids.piston, DoModded)
+
+  -- Add useful stuff
+  local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash"})
+  SetSidedTrash(slideTrash, slideCallback)
+
+  local slideEnemy = addCell("EMC slide-enemy", texp .. "enemy_side.png", {type="sideenemy"})
+  SetSidedEnemy(slideEnemy, slideCallback)
+
+  ids.trashMover = addCell("EMC trash-mover", texp .. "trashMove.png", Options.sidetrash)
+
+  SetSidedTrash(ids.trashMover, function(x, y, dir)
+    return ((dir+2)%4 == cells[y][x].rot)
+  end)
+
+  if Toolbar then
+    local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
+
+    mechCat:AddItem("Motion Sensor", "Senses motion", ids.motionSensor)
+    mechCat:AddItem("Wire", "Can spread mechanical signals further", ids.wire)
+    mechCat:AddItem("Activator", "Acts like a freezer until recieving mechanical signal", ids.activator)
+    mechCat:AddItem("Delayer", "It's like a slow wire", ids.delayer)
+    mechCat:AddItem("Piston", "When it recieved a mechanical signal, it pushes a cell back", ids.piston)
+    mechCat:AddItem("Mechanical Generator", "Constantly generaters mechanical signals", ids.mech_gen)
+
+    -- Add gates o no
+    local mechGateCat = mechCat:AddCategory("Mechanical Gates", "Cells that combine inputs to get a processed output", texp .. "gates/and.png")
+
+    mechGateCat:AddItem("AND", "Performs AND operation", ids.g_and)
+    mechGateCat:AddItem("OR", "Performs OR operation", ids.g_or)
+    mechGateCat:AddItem("XOR", "Performs XOR operation", ids.g_xor)
+    mechGateCat:AddItem("NAND", "Performs NAND operation", ids.g_nand)
+    mechGateCat:AddItem("NOR", "Performs NOR operation", ids.g_nor)
+    mechGateCat:AddItem("XNOR", "Performs XNOR operation", ids.g_xnor)
+    mechGateCat:AddItem("NOT", "Performs NOT operation", ids.g_not)
+
+    local destCat = Toolbar:GetCategory("Destroyers")
+    destCat:AddItem("Enemy Slider", "Enemy but cells can only fall in from 2 sides", slideEnemy)
+    destCat:AddItem("Trash Slider", "Trash but cells can only fall in from 2 sides", slideTrash)
+    destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
+
+  end
+end
+
+local function DoPiston(x, y, dir)
+  if cells[y][x].mech_signal then
+    PushCell(x, y, dir)
+  end
+end
+
+local function update(id, x, y, dir)
+  if id == ids.motionSensor then
+    DoMotionSensor(x, y, dir)
+  elseif id == ids.delayer then
+    DoDelayer(x, y)
+  elseif id == ids.g_and then
+    DoLogicGate(x, y, dir, "and")
+  elseif id == ids.g_or then
+    DoLogicGate(x, y, dir, "or")
+  elseif id == ids.g_xor then
+    DoLogicGate(x, y, dir, "xor")
+  elseif id == ids.g_nand then
+    DoLogicGate(x, y, dir, "nand")
+  elseif id == ids.g_nor then
+    DoLogicGate(x, y, dir, "nor")
+  elseif id == ids.g_xnor then
+    DoLogicGate(x, y, dir, "xnor")
+  elseif id == ids.g_not then
+    DoLogicGate(x, y, dir, "not")
+  elseif id == ids.mech_gen then
+    SignalMechanical(x, y)
+  elseif id == ids.piston then
+    DoPiston(x, y, dir)
+  elseif id == ids.trashMover then
+    DoTrashMover(x, y, dir)
+  elseif id == ids.wire and isMechOn(x, y) then
+    cells[y][x].testvar = cells[y][x].mech_signal
+  end
+
+  if isMechOn(x, y) then
+    cells[y][x].mech_signal = cells[y][x].mech_signal - 1
+  end
+end
+
+local function onCellDraw(id, x, y, rot)
+  if id == ids.wire then
+    local spos = calculateScreenPosition(x, y)
+    local renderArm = function(r)
+      love.graphics.draw(wireArm.tex, spos.x, spos.y, r*half_pi, zoom/wireArm.size.w, zoom/wireArm.size.h, wireArm.size.w2, wireArm.size.h2)
+    end
+
+    if isConnectable(cells[y][x+1].ctype) then
+      renderArm(0)
+    end
+    if isConnectable(cells[y][x-1].ctype) then
+      renderArm(2)
+    end
+    if isConnectable(cells[y+1][x].ctype) then
+      renderArm(1)
+    end
+    if isConnectable(cells[y-1][x].ctype) then
+      renderArm(3)
+    end
+
+    if isMechOn(x, y) then
+      love.graphics.draw(wireActive.tex, spos.x, spos.y, rot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
+    end
+  elseif id == ids.piston and cells[y][x].mech_signal then
+    local spos = calculateScreenPosition(x, y)
+
+    love.graphics.draw(pistonOn.tex, spos.x, spos.y, rot*half_pi, zoom/pistonOn.size.w, zoom/pistonOn.size.h, pistonOn.size.w2, pistonOn.size.h2)
+  end
+end
+
+local function tick()
+  -- No tick plz
+end
+
+local function onPlace(id, x, y, rot)
+  cells[y][x].mech_signal = 0
+end
+
+
+return {
+  init = init,
+  update = update,
+  tick = tick,
+  onCellDraw = onCellDraw,
+  onPlace = onPlace,
+}
