@@ -11,3 +11,5 @@ icon.png
 main.lua
 mods.txt
 music.wav
+.vscode
+.vscode/*
