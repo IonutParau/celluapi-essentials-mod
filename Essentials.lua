@@ -99,6 +99,9 @@ local function onPlace(id, x, y, rot, original)
   if Toolbar then
     ToolbarPlaceTools(id, x, y, rot, original)
   end
+  if Ereturns.MoreCells then
+    Ereturns.MoreCells.onPlace(id, x, y, rot, original, originalInitial)
+  end
 end
 
 local function tick()

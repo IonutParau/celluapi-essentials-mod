@@ -51,6 +51,7 @@ end
 
 function Resourcer.GetIdentifier(id)
   if id == "*" then return id end
+  if type(id) == "string" then return id end
   if id > initialCellCount then
     return getCellLabelById(id)
   else
@@ -66,7 +67,7 @@ local function loadResource(path)
     if code["images"]["overrides"] then
       for key, image in pairs(code["images"]["overrides"]) do
         local img = love.graphics.newImage(image)
-        key = Resourcer.GetIdentifier(key)
+        key = Resourcer.FromIdentifier(key)
         tex[key] = img
         texsize[key] = {
           w = img:getWidth(),
@@ -209,9 +210,14 @@ function Resourcer.UpdateAnimations()
   end
 end
 
+local function hasSuffix(str, suf)
+  return (str:sub(-string.len(suf)) == suf)
+end
+
 function Resourcer.RenderOverlay(id, x, y, rot)
   local lastvars = {}
-  if rot == nil then
+  local orot = rot
+  if type(rot) ~= "number" then
     rot = cells[y][x].rot
     lastvars = cells[y][x].lastvars
   else
@@ -220,8 +226,10 @@ function Resourcer.RenderOverlay(id, x, y, rot)
   id = Resourcer.GetIdentifier(id)
   if overlays[id] then
     love.graphics.draw((overlays[id]),math.floor(lerp(lastvars[1],x,itime/delay)*zoom-offx+zoom/2),math.floor(lerp(lastvars[2],y,itime/delay)*zoom-offy+zoom/2),lerp(lastvars[3],lastvars[3]+((rot-lastvars[3]+2)%4-2),itime/delay)*math.pi/2,zoom/(overlaySize[id]).w,zoom/(overlaySize[id]).h,(overlaySize[id]).w2,(overlaySize[id]).h2)
+  elseif overlays[id .. "-running"] and (not (paused or inmenu)) then
+    Resourcer.RenderOverlay(id .. "-running", x, y, orot)
   elseif id ~= "*" then
-    Resourcer.RenderOverlay("*", x, y, rot)
+    Resourcer.RenderOverlay("*", x, y, orot)
   end
 end
 

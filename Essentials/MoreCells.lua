@@ -7,6 +7,8 @@ end
 
 local half_pi = math.pi / 2
 
+local MAX_MECH = 2
+
 local function makeTex(pic)
   local t = love.graphics.newImage(pic)
   return {
@@ -52,6 +54,12 @@ local function GetForward(dir, amount)
   end
 end
 
+local function GetFullForward(x, y, dir, amount)
+  local off = GetForward(dir, amount)
+
+  return x + off.x, y + off.y
+end
+
 local function isMech(id)
   local l = getCellLabelById(id) or id
 
@@ -73,8 +81,16 @@ local function isConnectable(id)
 end
 
 local function isMechOn(x, y)
-  if not isMech(cells[y][x].ctype) then return false end
+  --if not isMech(cells[y][x].ctype) then return false end
   local s = cells[y][x].mech_signal
+  if s == nil then s = 0 end
+
+  return s > 0
+end
+
+local function wasMechOn(x, y)
+  --if not isMech(cells[y][x].ctype) then return false end
+  local s = cells[y][x].prev_mech_signal
   if s == nil then s = 0 end
 
   return s > 0
@@ -87,7 +103,7 @@ function SignalMechanical(x, y, blockdir, forced)
     forced = true
   end
 
-  cells[y][x].mech_signal = 2 -- OMG he powered
+  cells[y][x].mech_signal = MAX_MECH -- OMG he powered
 
   for i=0,3 do
     if i ~= blockdir then
@@ -97,7 +113,7 @@ function SignalMechanical(x, y, blockdir, forced)
       if not forced then
         canSpread = (cells[y][x].ctype == ids.wire)
       end
-      if isMech(cells[oy][ox].ctype) and canSpread and not isMechOn(ox, oy) then
+      if isMech(cells[oy][ox].ctype) and canSpread and (cells[oy][ox].mech_signal < MAX_MECH) then
         SignalMechanical(ox, oy, nil, false)
       end
     end
@@ -138,7 +154,9 @@ end
 
 local function DoDelayer(x, y)
   if isMechOn(x, y) then
-    SignalMechanical(x, y)
+    local front = GetForward(cells[y][x].rot)
+    local fx, fy = x + front.x, y + front.y
+    SignalMechanical(fx, fy, (cells[y][x].rot+2)%4, false)
     cells[y][x].mech_signal = 0
   end
 end
@@ -273,14 +291,26 @@ local function DoTrashMover(x, y, dir)
   end
 end
 
+local function DoStickyPiston(x, y, dir)
+  if isMechOn(x, y) then
+    PushCell(x, y, dir)
+  elseif wasMechOn(x, y) then
+    local fx, fy = GetFullForward(x, y, dir, 2)
+
+    PullCell(fx, fy, (dir+2)%4, false, 1)
+  end
+end
+
 local function init()
   -- Gens
   ids.motionSensor = addCell("EMC mech motion-sensor", texp .. "motionSensor.png", {updateindex = 1})
-  ids.wire = addCell("EMC mech wire", texp .. "wire/off.png", {updateindex = 2})
-  ids.mech_gen = addCell("EMC mech mech_gen", texp .. "mech_gen.png", {updateindex = 3})
+  ids.delayer = addCell("EMC mech motion-sensor", texp .. "delayer.png", {updateindex = 2})
+  ids.wire = addCell("EMC mech wire", texp .. "wire/off.png", {updateindex = 3})
+  ids.mech_gen = addCell("EMC mech mech_gen", texp .. "mech_gen.png", {updateindex = 4})
   -- Users
   ids.activator = addCell("EMC mech activator", texp .. "activator.png", Options.neverupdate)
   ids.piston = addCell("EMC mech piston", texp .. "piston/off.png", Options.neverupdate)
+  ids.stickyPiston = addCell("EMC mech piston-sticky", texp .. "piston/off.png", Options.neverupdate)
 
   -- Add gates
   ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
@@ -294,6 +324,7 @@ local function init()
   table.insert(subticks, GenerateSubtick({ ids.g_and, ids.g_or, ids.g_xor, ids.g_nand, ids.g_nor, ids.g_xnor, ids.g_not }, DoModded, true))
   table.insert(subticks, 4, GenerateSubtick(ids.activator, DoActivator, true))
   giveSubtick(ids.piston, DoModded)
+  giveSubtick(ids.stickyPiston, DoModded)
 
   -- Add useful stuff
   local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash"})
@@ -316,6 +347,7 @@ local function init()
     mechCat:AddItem("Activator", "Acts like a freezer until recieving mechanical signal", ids.activator)
     mechCat:AddItem("Delayer", "It's like a slow wire", ids.delayer)
     mechCat:AddItem("Piston", "When it recieved a mechanical signal, it pushes a cell back", ids.piston)
+    mechCat:AddItem("Sticky Piston", "When it recieved a mechanical signal, it pushes a cell back. When that signal stops, it pulls it back", ids.stickyPiston)
     mechCat:AddItem("Mechanical Generator", "Constantly generaters mechanical signals", ids.mech_gen)
 
     -- Add gates o no
@@ -338,7 +370,7 @@ local function init()
 end
 
 local function DoPiston(x, y, dir)
-  if cells[y][x].mech_signal then
+  if isMechOn(x, y) then
     PushCell(x, y, dir)
   end
 end
@@ -366,12 +398,15 @@ local function update(id, x, y, dir)
     SignalMechanical(x, y)
   elseif id == ids.piston then
     DoPiston(x, y, dir)
+  elseif id == ids.stickyPiston then
+    DoStickyPiston(x, y, dir)
   elseif id == ids.trashMover then
     DoTrashMover(x, y, dir)
   elseif id == ids.wire and isMechOn(x, y) then
     cells[y][x].testvar = cells[y][x].mech_signal
   end
 
+  cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
   if isMechOn(x, y) then
     cells[y][x].mech_signal = cells[y][x].mech_signal - 1
   end
@@ -379,7 +414,7 @@ end
 
 local function onCellDraw(id, x, y, rot)
   if id == ids.wire then
-    local spos = calculateScreenPosition(x, y)
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
     local renderArm = function(r)
       love.graphics.draw(wireArm.tex, spos.x, spos.y, r*half_pi, zoom/wireArm.size.w, zoom/wireArm.size.h, wireArm.size.w2, wireArm.size.h2)
     end
@@ -400,8 +435,8 @@ local function onCellDraw(id, x, y, rot)
     if isMechOn(x, y) then
       love.graphics.draw(wireActive.tex, spos.x, spos.y, rot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
     end
-  elseif id == ids.piston and cells[y][x].mech_signal then
-    local spos = calculateScreenPosition(x, y)
+  elseif id == ids.piston and isMechOn(x, y) then
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
     love.graphics.draw(pistonOn.tex, spos.x, spos.y, rot*half_pi, zoom/pistonOn.size.w, zoom/pistonOn.size.h, pistonOn.size.w2, pistonOn.size.h2)
   end

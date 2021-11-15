@@ -263,8 +263,15 @@ local function dofill(id, x, y, rot, original, ox, oy)
     return
   end
 
+  local original = CopyTable(cells[oy][ox])
   cells[oy][ox].ctype = id
   cells[oy][ox].rot = rot
+  local originalInitial = CopyTable(initial[oy][ox])
+  if isinitial then
+    initial[oy][ox].ctype = id
+    initial[oy][ox].rot = currentrot
+  end
+  modsOnPlace(id, x, y, rot, original, originalInitial)
 
   for fx=ox-1,ox+1 do
     for fy=oy-1,oy+1 do
@@ -364,7 +371,7 @@ function DoToolbarUpdate()
     if cat ~= nil and type(cat) == "table" and type(cat.items) == "table" then
       current = cat
       currentstate = 0
-      pages = 1 
+      page = 1 
     end
   end
   applyRendering()
