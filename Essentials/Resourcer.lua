@@ -12,6 +12,12 @@ local mouse
 local animations = {}
 local animCounter = 0
 
+local originalTex = {}
+local originalSize = {}
+
+local originalOverlays = {}
+local originalOverlaySize = {}
+
 --- @class Resourcer.Animation
 --- @field imgs table
 --- @field current number
@@ -21,6 +27,7 @@ local function Animation()
     imgs = {},
     current = 1,
     interval = 0,
+    type = "override",
   }
 end
 
@@ -40,6 +47,17 @@ function Resourcer.Settings(newSettings)
       settings[k] = v
     end
   end
+end
+
+function Resourcer.FromSmartIdentifier(id)
+  local canRun = true
+
+  if string.sub(id, -#"-running") == "-running" then
+    id = string.sub(id, 1, #id-#"-running")
+    canRun = not (paused or inmenu)
+  end
+
+  return canRun, Resourcer.FromIdentifier(id)
 end
 
 function Resourcer.FromIdentifier(id)
@@ -109,6 +127,7 @@ local function loadResource(path)
         local anim = Animation()
         anim.interval = interval
         anim.imgs = textures
+        anim.type = image["type"] or "override"
         animations[Resourcer.FromIdentifier(key)] = anim
       end
     end
@@ -162,11 +181,13 @@ end
 ---@param id number|string The id or label of the cell to animate
 ---@param textures table The table of frames (aka textures) to animate with
 ---@param interval number How long (in ticks) does the frame in the animation last
+---@param type "\"override\""|"\"overlay\"" Optional - The type of animation.
 ---@return Resourcer.Animation
-function Resourcer.createAnimation(id, textures, interval)
+function Resourcer.createAnimation(id, textures, interval, type)
   local anim = Animation()
   anim.interval = interval
   anim.imgs = textures
+  anim.type = type or "override"
   animations[Resourcer.FromIdentifier(id)] = anim
 
   return anim
@@ -184,6 +205,8 @@ function Resourcer.RenderMouse()
 end
 
 function Resourcer.LoadResources(path)
+  originalTex = CopyTable(tex)
+  originalSize = CopyTable(texsize)
   local resources = love.filesystem.getDirectoryItems(path)
 
   for _, name in ipairs(resources) do
@@ -192,26 +215,43 @@ function Resourcer.LoadResources(path)
 			loadResource(path .. '/' .. name)
 		end
   end
+
+  originalOverlays = CopyTable(overlays)
+  originalOverlaySize = CopyTable(overlaySize)
 end
 
 function Resourcer.UpdateAnimations()
   animCounter = animCounter + 1
-  for id, animation in pairs(animations) do
-    local texture = animation.imgs[animation.current]
-    tex[id] = texture.image
-    texsize[id] = texture.size
+  for rawid, animation in pairs(animations) do
+    local canRun, id = Resourcer.FromSmartIdentifier(rawid)
+    if canRun then
+      local texture = animation.imgs[animation.current]
+      if animation.type == "overlay" then
+        id = tostring(id)
+        overlays[id] = texture.image
+        overlaySize[id] = texture.size
+      else
+        tex[id] = texture.image
+        texsize[id] = texture.size
+      end
 
-    if animCounter % (animation.interval) == 0 then
-      animation.current = animation.current + 1
-      if animation.current > #(animation.imgs) then
-        animation.current = 1
+      if animCounter % (animation.interval) == 0 then
+        animation.current = animation.current + 1
+        if animation.current > #(animation.imgs) then
+          animation.current = 1
+        end
+      end
+    else
+      if animation.type == "overlay" then
+        id = tostring(id)
+        overlays[id] = originalOverlays[id]
+        overlaySize[id] = originalOverlaySize[id]
+      else
+        tex[id] = originalTex[id]
+        texsize[id] = originalSize[id]
       end
     end
   end
-end
-
-local function hasSuffix(str, suf)
-  return (str:sub(-string.len(suf)) == suf)
 end
 
 function Resourcer.RenderOverlay(id, x, y, rot)

@@ -1,5 +1,7 @@
 local json = require("libs.json")
 
+local pastcurrentstate = 1
+
 local texp = "Toolbar/"
 if IsEssentials == true then
   texp = "Essentials/" .. texp
@@ -349,15 +351,15 @@ function DoToolbarUpdate()
 
   if currentstate == backp and current ~= Toolbar then
     current = current.hypercat
-    currentstate = 0
+    currentstate = pastcurrentstate
   elseif type(currentstate) == "string" and string.sub(currentstate, 1, 10) == "structure-" then
     ToolbarSystem.ActivateStructure(structures[currentstate])
-    currentstate = 0
+    currentstate = pastcurrentstate
   elseif currentstate == "save-struct" and copied then
     local s = ToolbarSystem.FromCopyToStructure()
     local text = json.encode(s)
     love.system.setClipboardText(text)
-    currentstate = 0
+    currentstate = pastcurrentstate
   elseif type(tools[currentstate]) == "boolean" then
     tools[currentstate] = not tools[currentstate]
     currentstate = 0
@@ -365,16 +367,18 @@ function DoToolbarUpdate()
     local text = love.system.getClipboardText()
     local s = json.decode(text, 0, "null")
     ToolbarSystem.ActivateStructure(s)
-    currentstate = 0
+    currentstate = pastcurrentstate
   else
     local cat = current:GetChild(currentstate, "image")
     if cat ~= nil and type(cat) == "table" and type(cat.items) == "table" then
       current = cat
-      currentstate = 0
+      currentstate = pastcurrentstate
       page = 1 
     end
   end
   applyRendering()
+
+  pastcurrentstate = currentstate
 end
 
 local function renderCell(id, x, y, rot)

@@ -10,6 +10,8 @@ local econfig = json.decode(love.filesystem.read("Essentials/config.json") or "{
 
 local Ereturns = {}
 
+local loadedResourcer = false
+
 for _, component in ipairs(econfig['components']) do
   Ereturns[component] = require("Essentials/" .. component)
 end
@@ -30,12 +32,6 @@ local function init()
   showinstructions = false
   if Ereturns.MoreCells then
     Ereturns.MoreCells.init()
-  end
-  if Resourcer then
-    Resourcer.Settings({
-      trans_overlay = econfig['resourcer_overlay_transparency']
-    })
-    Resourcer.LoadResources(econfig['resourcer_path'])
   end
   for _, custom in ipairs(econfig['customComponents']) do
     local cc = require(custom)
@@ -60,6 +56,13 @@ end
 local function customdraw()
   if Toolbar then DoToolbarRender() end
   if Resourcer then
+    if not loadedResourcer then
+      Resourcer.Settings({
+        trans_overlay = econfig['resourcer_overlay_transparency']
+      })
+      Resourcer.LoadResources(econfig['resourcer_path'])
+      loadedResourcer = true
+    end
     Resourcer.RenderListOverlays()
     Resourcer.RenderMouse()
     if copied and pasting then
