@@ -13,5 +13,3 @@ mods.txt
 music.wav
 .vscode
 .vscode/*
-Essentials/Resources/*
-!Essentials/Resources
