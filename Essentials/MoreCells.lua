@@ -113,7 +113,7 @@ function SignalMechanical(x, y, blockdir, forced)
       if not forced then
         canSpread = (cells[y][x].ctype == ids.wire)
       end
-      if isMech(cells[oy][ox].ctype) and canSpread and (cells[oy][ox].mech_signal < MAX_MECH) then
+      if isMech(cells[oy][ox].ctype) and canSpread and ((cells[oy][ox].mech_signal or 0) < MAX_MECH) then
         SignalMechanical(ox, oy, nil, false)
       end
     end
