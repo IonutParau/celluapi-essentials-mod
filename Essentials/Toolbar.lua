@@ -214,6 +214,14 @@ function ToolbarSystem.ActivateStructure(structure)
   copied = s
 end
 
+local function reverseRealID(id)
+  if id > initialCellCount then
+    return getCellLabelbyId(id)
+  else
+    return id
+  end
+end
+
 ---@return ToolbarSystem.Structure
 function ToolbarSystem.FromCopyToStructure()
   local swidth = #copied[0]
@@ -227,7 +235,7 @@ function ToolbarSystem.FromCopyToStructure()
         table.insert(
           items,
           {
-            id = copied[y][x].ctype,
+            id = reverseRealID(copied[y][x].ctype),
             rot = copied[y][x].rot,
             x = x + 1,
             y = y + 1,
