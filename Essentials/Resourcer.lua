@@ -81,9 +81,22 @@ local function loadResource(path)
   path = path or "Essentials/Resources"
   local code = json.decode(love.filesystem.read(path), 0, 'null')
 
+  local vars = code["vars"] or {}
+
+  local varParse = function(v)
+    for var, val in pairs(vars) do
+      if string.find(v, "$" .. var, nil, true) then
+        return string.gsub(v, "$" .. var, val)
+      end
+    end
+    return v
+  end
+
   if code["images"] then
     if code["images"]["overrides"] then
       for key, image in pairs(code["images"]["overrides"]) do
+        key = varParse(key)
+        image = varParse(image)
         local img = love.graphics.newImage(image)
         key = Resourcer.FromIdentifier(key)
         tex[key] = img
@@ -97,6 +110,8 @@ local function loadResource(path)
     end
     if code["images"]["overlays"] then
       for key, image in pairs(code["images"]["overlays"]) do
+        key = varParse(key)
+        image = varParse(image)
         local img = love.graphics.newImage(image)
         overlays[key] = img
         overlaySize[key] = {
@@ -109,9 +124,11 @@ local function loadResource(path)
     end
     if code["images"]["animations"] then
       for key, image in pairs(code["images"]["animations"]) do
+        key = varParse(key)
         local interval = image["interval"]
         local textures = {}
         for _, img in ipairs(image["textures"]) do
+          img = varParse(img)
           local t = love.graphics.newImage(img)
           local s = {
             w = t:getWidth(),
