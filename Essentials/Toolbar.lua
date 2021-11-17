@@ -283,7 +283,7 @@ end
 function ToolbarPlaceTools(id, x, y, rot, original)
   if tools["tool-fill"] then
     if cells[y][x].ctype == original.ctype and cells[y][x].rot == original.rot then return end
-    cells[y][x].ctype = original.ctype
+    cells[y][x] = original
     tools["tool-fill"] = false
     dofill(id, x, y, rot, original, x, y)
     tools["tool-fill"] = true
@@ -426,7 +426,18 @@ function DoToolbarRender()
     end
   end
 
+  local r, g, b, a = love.graphics.getColor()
+
+  love.graphics.setColor(0.5, 0.5, 0.5, 0.7)
+  love.graphics.rectangle("fill", 0, 550*winym, 800*winxm, 600*winym)
+
+  love.graphics.setColor(r, g, b, a)
+
   for i=0,15 do
+    if listorder[i+16*(page-1)+1] then
+      if currentstate == listorder[i+16*(page-1)+1] then love.graphics.setColor(1,1,1,1) else love.graphics.setColor(1,1,1,0.5) end
+      love.graphics.draw(tex[listorder[i+16*(page-1)+1]],(25+(775-25)*i/15)*winxm,575*winym,currentrot*math.pi/2,40*winxm/texsize[listorder[i+16*(page-1)+1]].w,40*winxm/texsize[listorder[i+16*(page-1)+1]].h,texsize[listorder[i+16*(page-1)+1]].w2,texsize[listorder[i+16*(page-1)+1]].h2)
+    end
     local li = listorder[i+16*(page-1)+1]
     if tools[li] == true then
       love.graphics.draw(toolOnTex,(25+(775-25)*i/15)*winxm,575*winym,currentrot*math.pi/2,40*winxm/toolOnSize.w,40*winxm/toolOnSize.h,toolOnSize.w2,toolOnSize.h2)
@@ -445,7 +456,7 @@ function DoToolbarRender()
           local title = item.display
           local charWidth = font:getWidth("a")
           local charHeight = 20
-          local boxOff = 7
+          local boxOff = 0
 
           local maxCharCount = math.max(math.min(50, #desc), math.max(#title * 2, 20))
 

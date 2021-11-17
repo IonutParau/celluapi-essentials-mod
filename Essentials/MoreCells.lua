@@ -25,6 +25,7 @@ end
 local wireArm = makeTex(texp .. "wire/arm.png")
 local wireActive = makeTex(texp .. "wire/on.png")
 local pistonOn = makeTex(texp .. "piston/on.png")
+local stickyPistonOn = makeTex(texp .. "piston/sticky-on.png")
 
 ---@param dir number
 ---@param amount number
@@ -310,7 +311,7 @@ local function init()
   -- Users
   ids.activator = addCell("EMC mech activator", texp .. "activator.png", Options.neverupdate)
   ids.piston = addCell("EMC mech piston", texp .. "piston/off.png", Options.neverupdate)
-  ids.stickyPiston = addCell("EMC mech piston-sticky", texp .. "piston/off.png", Options.neverupdate)
+  ids.stickyPiston = addCell("EMC mech piston-sticky", texp .. "piston/sticky-off.png", Options.neverupdate)
 
   -- Add gates
   ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
@@ -439,6 +440,10 @@ local function onCellDraw(id, x, y, rot)
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
     love.graphics.draw(pistonOn.tex, spos.x, spos.y, rot*half_pi, zoom/pistonOn.size.w, zoom/pistonOn.size.h, pistonOn.size.w2, pistonOn.size.h2)
+  elseif id == ids.stickyPiston and isMechOn(x, y) then
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
+
+    love.graphics.draw(stickyPistonOn.tex, spos.x, spos.y, rot*half_pi, zoom/stickyPistonOn.size.w, zoom/stickyPistonOn.size.h, stickyPistonOn.size.w2, stickyPistonOn.size.h2)
   end
 end
 
