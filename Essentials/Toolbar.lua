@@ -14,6 +14,8 @@ local fontp = texp .. "arial.ttf"
 
 local tools = {}
 
+local isFilling = false
+
 local toolPlaceData = {
   x = 0,
   y = 0,
@@ -250,34 +252,30 @@ local function inGrid(x, y)
 end
 
 local function dofill(id, x, y, rot, original, ox, oy)
-  ox = ox or x
-  oy = oy or y
-
   local dist = (ox - x) ^ 2 + (oy - y) ^ 2
 
-  if dist > 35 ^ 2 then return end -- No stackoverflow for u, also 35 is weak limit
+  if dist > 33 ^ 2 then return end -- No stackoverflow for u, also 33 is weak limit
 
   if not inGrid(ox, oy) then
     return
   end
 
-  if cells[oy][ox].ctype ~= original.ctype or cells[oy][ox].rot ~= original.rot then
-    return
-  end
+  if (cells[oy][ox].ctype == original.ctype) and (cells[oy][ox].rot == original.rot) then
+    local original = CopyTable(cells[oy][ox])
+    cells[oy][ox].ctype = id
+    cells[oy][ox].rot = rot
+    local originalInitial = CopyTable(initial[oy][ox])
+    if isinitial then
+      initial[oy][ox].ctype = id
+      initial[oy][ox].rot = currentrot
+    end
+    SetChunk(ox, oy, id)
+    modsOnPlace(id, x, y, rot, original, originalInitial)
 
-  local original = CopyTable(cells[oy][ox])
-  cells[oy][ox].ctype = id
-  cells[oy][ox].rot = rot
-  local originalInitial = CopyTable(initial[oy][ox])
-  if isinitial then
-    initial[oy][ox].ctype = id
-    initial[oy][ox].rot = currentrot
-  end
-  modsOnPlace(id, x, y, rot, original, originalInitial)
-
-  for fx=ox-1,ox+1 do
-    for fy=oy-1,oy+1 do
-      dofill(id, x, y, rot, original, fx, fy)
+    for fx=ox-1,ox+1 do
+      for fy=oy-1,oy+1 do
+        dofill(id, x, y, rot, original, fx, fy)
+      end
     end
   end
 end
@@ -286,7 +284,9 @@ function ToolbarPlaceTools(id, x, y, rot, original)
   if tools["tool-fill"] then
     if cells[y][x].ctype == original.ctype and cells[y][x].rot == original.rot then return end
     cells[y][x].ctype = original.ctype
-    dofill(id, x, y, rot, original)
+    tools["tool-fill"] = false
+    dofill(id, x, y, rot, original, x, y)
+    tools["tool-fill"] = true
   elseif tools["tool-square"] and not toolPlaceData.enabled then
     toolPlaceData.x = x
     toolPlaceData.y = y
@@ -328,6 +328,7 @@ function ToolbarClickTools(clickType, x, y)
             initial[py][px].ctype = id
             initial[py][px].rot = currentrot
           end
+          SetChunk(px, py, currentstate)
           modsOnPlace(id, px, py, currentrot, original, originalInitial)
         end
       end
@@ -362,7 +363,7 @@ function DoToolbarUpdate()
     currentstate = pastcurrentstate
   elseif type(tools[currentstate]) == "boolean" then
     tools[currentstate] = not tools[currentstate]
-    currentstate = 0
+    currentstate = pastcurrentstate
   elseif currentstate == "load-struct" then
     local text = love.system.getClipboardText()
     local s = json.decode(text, 0, "null")
