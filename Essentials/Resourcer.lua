@@ -83,14 +83,16 @@ local function loadResource(path)
 
   local vars = code["vars"] or {}
 
-  local varParse = function(v)
+  local function varParse(v)
     for var, val in pairs(vars) do
       if string.find(v, "$" .. var, nil, true) then
-        return string.gsub(v, "$" .. var, val)
+        return varParse(string.gsub(v, "$" .. var, val))
       end
     end
     return v
   end
+
+  vars["PATH"] = settings.run_path
 
   if code["images"] then
     if code["images"]["overrides"] then
@@ -150,7 +152,7 @@ local function loadResource(path)
     end
   end
   if code["mouse"] then
-    local img = love.graphics.newImage(code["mouse"])
+    local img = love.graphics.newImage(varParse(code["mouse"]))
     mouse = {
       img = img,
       w = img:getWidth(),
@@ -162,6 +164,8 @@ local function loadResource(path)
   end
   if code["sounds"] then
     for key, sound in pairs(code["sounds"]) do
+      key = varParse(key)
+      sound = varParse(sound)
       local s = love.audio.newSource(sound)
       if key == "game" then
         music:stop()
@@ -224,6 +228,7 @@ end
 function Resourcer.LoadResources(path)
   originalTex = CopyTable(tex)
   originalSize = CopyTable(texsize)
+  settings.run_path = path
   local resources = love.filesystem.getDirectoryItems(path)
 
   for _, name in ipairs(resources) do
