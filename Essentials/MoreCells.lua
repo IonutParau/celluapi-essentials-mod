@@ -214,6 +214,35 @@ local function giveSubtick(id, updateFunc, static)
   table.insert(subticks, GenerateSubtick(id, updateFunc, not (static or false)))
 end
 
+local function Do4Gen(x, y)
+  local workingOffs = {}
+  local backWorks = {}
+
+  for dir=0,3 do
+    local fx, fy = GetFullForward(x, y, dir)
+
+    if cells[fy][fx].ctype ~= 0 and cells[fy][fx].ctype ~= 40 then
+      table.insert(workingOffs, dir)
+      local bx, by = GetFullForward(x, y, dir, -1)
+
+      backWorks[dir] = CopyTable(cells[by][bx])
+    end
+  end
+
+  for _, dir in ipairs(workingOffs) do
+    dir = (dir+2)%4
+    local fx, fy = GetFullForward(x, y, dir)
+    if PushCell(x, y, dir) then
+      local back = backWorks[dir]
+      if back.ctype == 40 or back.ctype == 0 then return end
+      cells[fy][fx].ctype = back.ctype
+      cells[fy][fx].rot = back.rot -- IDK why but this works
+
+      if cells[fy][fx].ctype == 19 then cells[fy][fx].ctype = 0 end
+    end
+  end
+end
+
 local function canPush(fx, fy, dir)
   -- Straight up immovable
   if cells[fy][fx].ctype == 40 or cells[fy][fx].ctype == -1 then
@@ -340,6 +369,8 @@ local function init()
     return ((dir+2)%4 == cells[y][x].rot)
   end)
 
+  ids.gen4 = addCell("EMC gen4", "textures/push.png")
+
   if Toolbar then
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
 
@@ -366,6 +397,9 @@ local function init()
     destCat:AddItem("Enemy Slider", "Enemy but cells can only fall in from 2 sides", slideEnemy)
     destCat:AddItem("Trash Slider", "Trash but cells can only fall in from 2 sides", slideTrash)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
+
+    local genCat = Toolbar:GetCategory("Generators")
+    genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides because... because.", ids.gen4)
 
   end
 end
@@ -405,6 +439,8 @@ local function update(id, x, y, dir)
     DoTrashMover(x, y, dir)
   elseif id == ids.wire and isMechOn(x, y) then
     cells[y][x].testvar = cells[y][x].mech_signal
+  elseif id == ids.gen4 then
+    Do4Gen(x, y)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
