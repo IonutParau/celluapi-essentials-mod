@@ -400,7 +400,7 @@ local function init()
     return ((dir+2)%4 == cells[y][x].rot)
   end)
 
-  ids.gen4 = addCell("EMC gen4", "textures/push.png")
+  ids.gen4 = addCell("EMC gen4", texp .. "4waygen.png")
 
   if Toolbar then
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
