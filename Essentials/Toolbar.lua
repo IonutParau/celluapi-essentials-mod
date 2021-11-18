@@ -436,8 +436,10 @@ function DoToolbarRender()
 
   local r, g, b, a = love.graphics.getColor()
 
+  local cellbarAltitude = 575 * winym - 25 * winxm
+
   love.graphics.setColor(0.5, 0.5, 0.5, 0.7)
-  love.graphics.rectangle("fill", 0, 550*winym, 800*winxm, 600*winym)
+  love.graphics.rectangle("fill", 0, cellbarAltitude, 800*winxm, 600*winym)
 
   love.graphics.setColor(r, g, b, a)
 
@@ -476,14 +478,14 @@ function DoToolbarRender()
 
           -- Draw box
           love.graphics.setColor(0.7, 0.7, 0.7, 0.7)
-          love.graphics.rectangle("fill", boxX, (480 - descHeight) * winym, maxDescWidth * winxm, charHeight * winym)
+          love.graphics.rectangle("fill", boxX, (cellbarAltitude/winym - 70 - descHeight) * winym, maxDescWidth * winxm, charHeight * winym)
           love.graphics.setColor(0.5, 0.5, 0.5, 0.7)
-          love.graphics.rectangle("fill", boxX, (500 - descHeight) * winym, maxDescWidth * winxm, (descHeight + 50) * winym)
+          love.graphics.rectangle("fill", boxX, (cellbarAltitude/winym - 50 - descHeight) * winym, maxDescWidth * winxm, (descHeight + 50) * winym)
 
           -- Render text
           love.graphics.setColor(1, 1, 1, 1)
-          love.graphics.print(item.display, boxX, (480 - descHeight) * winym, 0, winxm, winym)
-          love.graphics.printf(desc, font, boxX, (500 - descHeight) * winym, maxDescWidth, nil, 0, winxm, winym)
+          love.graphics.print(item.display, boxX, (cellbarAltitude/winym - 70 - descHeight) * winym, 0, winxm, winym)
+          love.graphics.printf(desc, font, boxX, (cellbarAltitude/winym - 50 - descHeight) * winym, maxDescWidth, nil, 0, winxm, winym)
 
         end
       end
