@@ -456,7 +456,7 @@ function DoToolbarRender()
 
   if y > 575-20*(winxm/winym) and y < 575+20*(winxm/winym) then
     for i=0,15 do
-      if x > 5+(775-25)*i/15 and x < 45+(775-25)*i/15 and listorder[i+16*(page-1)+1] then
+      if (x > 5+(775-25)*i/15 and x < 45+(775-25)*i/15 and listorder[i+16*(page-1)+1]) then
         local li = listorder[i+16*(page-1)+1]
         local item = current:GetChild(li, "image")
         if type(item) == "table" then

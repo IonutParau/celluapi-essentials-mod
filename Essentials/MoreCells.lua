@@ -77,8 +77,32 @@ local function isGate(id)
   return (l:sub(1, #suffix) == suffix)
 end
 
-local function isConnectable(id)
-  return isMech(id) or isGate(id)
+local function isConnectable(cell, dir)
+  local id = cell.ctype
+
+  local rdir = dir - cell.rot
+
+  if isMech(id) then
+    if id == ids.wire or id == ids.activator or id == ids.mech_gen then
+      return true
+    end
+
+    if (id == ids.motionSensor) or (id == ids.piston) or (id == ids.stickyPiston) then
+      return rdir ~= 2
+    end
+
+    if id == ids.delayer then
+      return rdir % 2 == 0
+    end
+  elseif isGate(id) then
+    if id == ids.g_not then
+      return rdir % 2 == 0
+    else
+      return (rdir ~= 0)
+    end
+  end
+
+  return false
 end
 
 local function isMechOn(x, y)
@@ -114,7 +138,7 @@ function SignalMechanical(x, y, blockdir, forced)
       if not forced then
         canSpread = (cells[y][x].ctype == ids.wire)
       end
-      if isMech(cells[oy][ox].ctype) and canSpread and ((cells[oy][ox].mech_signal or 0) < MAX_MECH) then
+      if isMech(cells[oy][ox].ctype) and isConnectable(cells[oy][ox], i) and canSpread and ((cells[oy][ox].mech_signal or 0) < MAX_MECH) then
         SignalMechanical(ox, oy, nil, false)
       end
     end
@@ -223,22 +247,28 @@ local function Do4Gen(x, y)
 
     if cells[fy][fx].ctype ~= 0 and cells[fy][fx].ctype ~= 40 then
       table.insert(workingOffs, dir)
-      local bx, by = GetFullForward(x, y, dir, -1)
+      local bx, by = GetFullForward(x, y, dir, 1)
+      local b = walkDivergedPath(x, y, bx, by)
+      bx = b.x
+      by = b.y
 
-      backWorks[dir] = CopyTable(cells[by][bx])
+      backWorks[(dir+2)%4] = CopyTable(cells[by][bx])
     end
   end
 
   for _, dir in ipairs(workingOffs) do
     dir = (dir+2)%4
     local fx, fy = GetFullForward(x, y, dir)
-    if PushCell(x, y, dir) then
-      local back = backWorks[dir]
-      if back.ctype == 40 or back.ctype == 0 then return end
-      cells[fy][fx].ctype = back.ctype
-      cells[fy][fx].rot = back.rot -- IDK why but this works
-
-      if cells[fy][fx].ctype == 19 then cells[fy][fx].ctype = 0 end
+    local f = walkDivergedPath(x, y, fx, fy)
+    fx = f.x
+    fy = f.y
+    local back = backWorks[dir]
+    if back.ctype ~= 0 and back.ctype ~= 40 then
+      local bdir = (back.rot + f.dir) % 4
+      if PushCell(x, y, dir, true, 1, back.ctype, bidr, nil, {fx, fy, bdir}) then
+        if cells[fy][fx].ctype == 19 then cells[fy][fx].ctype = 0 end
+        if cells[fy][fx].ctype == ids.gen4 then cells[fy][fx].updated = true end
+      end
     end
   end
 end
@@ -366,6 +396,7 @@ local function init()
   ids.trashMover = addCell("EMC trash-mover", texp .. "trashMove.png", Options.sidetrash)
 
   SetSidedTrash(ids.trashMover, function(x, y, dir)
+    if dir == nil then return false end
     return ((dir+2)%4 == cells[y][x].rot)
   end)
 
@@ -456,16 +487,16 @@ local function onCellDraw(id, x, y, rot)
       love.graphics.draw(wireArm.tex, spos.x, spos.y, r*half_pi, zoom/wireArm.size.w, zoom/wireArm.size.h, wireArm.size.w2, wireArm.size.h2)
     end
 
-    if isConnectable(cells[y][x+1].ctype) then
+    if isConnectable(cells[y][x+1], 0) then
       renderArm(0)
     end
-    if isConnectable(cells[y][x-1].ctype) then
+    if isConnectable(cells[y][x-1], 2) then
       renderArm(2)
     end
-    if isConnectable(cells[y+1][x].ctype) then
+    if isConnectable(cells[y+1][x], 1) then
       renderArm(1)
     end
-    if isConnectable(cells[y-1][x].ctype) then
+    if isConnectable(cells[y-1][x], 3) then
       renderArm(3)
     end
 

@@ -39,6 +39,10 @@ local function init()
     table.insert(customComponents, cc)
   end
   runCustomComponentCallback('load', CopyTable(econfig))
+  DirFromOff = function(ox, oy)
+    if ox > 0 then return 0 elseif ox < 0 then return 2 end
+	  if oy > 0 then return 1 elseif oy < 0 then return 3 end
+  end
 end
 
 local function customupdate(dt)
