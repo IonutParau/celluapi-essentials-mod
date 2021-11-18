@@ -264,8 +264,8 @@ local function Do4Gen(x, y)
     fy = f.y
     local back = backWorks[dir]
     if back.ctype ~= 0 and back.ctype ~= 40 then
-      local bdir = (back.rot + f.dir) % 4
-      if PushCell(x, y, dir, true, 1, back.ctype, bidr, nil, {fx, fy, bdir}) then
+      local bdir = (back.rot + f.dir - dir) % 4
+      if PushCell(x, y, dir, true, 1, back.ctype, bdir, nil, {x, y, bdir}) then
         if cells[fy][fx].ctype == 19 then cells[fy][fx].ctype = 0 end
         if cells[fy][fx].ctype == ids.gen4 then cells[fy][fx].updated = true end
       end

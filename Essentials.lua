@@ -10,6 +10,9 @@ local econfig = json.decode(love.filesystem.read("Essentials/config.json") or "{
 
 local Ereturns = {}
 
+local ver = "dededadsadawedas"
+local v2 = "dededadsadawedas"
+
 local loadedResourcer = false
 
 for _, component in ipairs(econfig['components']) do
@@ -29,6 +32,10 @@ end
 local atime = 0
 
 local function init()
+  if ver ~= v2 then
+
+  end
+
   showinstructions = false
   if Ereturns.MoreCells then
     Ereturns.MoreCells.init()
@@ -127,4 +134,8 @@ return {
   onMousePressed = onMousePressed,
   onMouseReleased = onMouseReleased,
   tick = tick,
+  version = ver,
+  dependencies = {
+    "Essentials"
+  }
 }
