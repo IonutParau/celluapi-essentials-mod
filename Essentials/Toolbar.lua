@@ -375,7 +375,7 @@ function DoToolbarUpdate()
   elseif currentstate == "load-struct" then
     local text = love.system.getClipboardText()
     local s = json.decode(text, 0, "null")
-    ToolbarSystem.ActivateStructure(s)
+    if type(s) == "table" then ToolbarSystem.ActivateStructure(s) end
     currentstate = pastcurrentstate
   else
     local cat = current:GetChild(currentstate, "image")
