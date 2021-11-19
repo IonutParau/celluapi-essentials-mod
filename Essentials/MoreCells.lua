@@ -428,6 +428,8 @@ local function init()
     destCat:AddItem("Enemy Slider", "Enemy but cells can only fall in from 2 sides", slideEnemy)
     destCat:AddItem("Trash Slider", "Trash but cells can only fall in from 2 sides", slideTrash)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
+    local movCat = Toolbar:GetCategory("Movers")
+    movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides because... because.", ids.gen4)

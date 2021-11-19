@@ -216,7 +216,7 @@ end
 
 local function reverseRealID(id)
   if id > initialCellCount then
-    return getCellLabelbyId(id)
+    return getCellLabelById(id)
   else
     return id
   end
@@ -322,22 +322,24 @@ function ToolbarClickTools(clickType, x, y)
     
     for oy=0,ey do
       for ox=0,ex do
-        local px, py = cx + ox, cy + oy
-        if inGrid(px, py) then
-          local original = CopyTable(cells[py][px])
-          local id = currentstate
-          if toolPlaceData.destroy then
-            id = 0
+        if (ox == 0 or ox == ex or oy == 0 or oy == ey) or (tools["tool-place-filled"]) then
+          local px, py = cx + ox, cy + oy
+          if inGrid(px, py) then
+            local original = CopyTable(cells[py][px])
+            local id = currentstate
+            if toolPlaceData.destroy then
+              id = 0
+            end
+            cells[py][px].ctype = id
+            cells[py][px].rot = currentrot
+            local originalInitial = CopyTable(initial[py][px])
+            if isinitial then
+              initial[py][px].ctype = id
+              initial[py][px].rot = currentrot
+            end
+            SetChunk(px, py, currentstate)
+            modsOnPlace(id, px, py, currentrot, original, originalInitial)
           end
-          cells[py][px].ctype = id
-          cells[py][px].rot = currentrot
-          local originalInitial = CopyTable(initial[py][px])
-          if isinitial then
-            initial[py][px].ctype = id
-            initial[py][px].rot = currentrot
-          end
-          SetChunk(px, py, currentstate)
-          modsOnPlace(id, px, py, currentrot, original, originalInitial)
         end
       end
     end
@@ -345,9 +347,108 @@ function ToolbarClickTools(clickType, x, y)
   end
 end
 
+local function empty(x, y)
+  return (cells[y][x].ctype == 0)
+end
+
+local function place(id, x, y, rot)
+  cells[y][x].ctype = id
+  cells[y][x].rot = rot
+
+  if isinitial then
+    initial[y][x].ctype = id
+    initial[y][x].rot = rot
+  end
+end
+
+local function defend()
+  local x = selx
+  local y = sely
+  local w, h = selw, selh
+
+  if w == 0 and h == 0 and x < 2 and y < 2 then return end
+
+  selx = math.max(x - 2, 1)
+  sely = math.max(y - 2, 1)
+
+  selw = math.min(w + 4, width-5)
+  selh = math.min(h + 4, height-5)
+
+  -- Layer 1 of trash
+  if inGrid(x+w, y+h) and empty(x+w, y+h) then
+    place(11, x+w, y+h, 0)
+  end
+  if inGrid(x-1, y-1) and empty(x-1, y-1) then
+    place(11, x-1, y-1, 0)
+  end
+  if inGrid(x-1, y+h) and empty(x-1, y+h) then
+    place(11, x-1, y+h, 0)
+  end
+  if inGrid(x+w, y-1) and empty(x+w, y-1) then
+    place(11, x+w, y-1, 0)
+  end
+  -- Layer 2 of trash
+  if inGrid(x+w+1, y+h+1) and empty(x+w+1, y+h+1) then
+    place(11, x+w+1, y+h+1, 0)
+  end
+  if inGrid(x-2, y-2) and empty(x-2, y-2) then
+    place(11, x-2, y-2, 0)
+  end
+  if inGrid(x-2, y+h+1) and empty(x-2, y+h+1) then
+    place(11, x-2, y+h+1, 0)
+  end
+  if inGrid(x+w+1, y-2) and empty(x+w+1, y-2) then
+    place(11, x+w+1, y-2, 0)
+  end
+
+  -- Layer 1 of sliders
+  for cy=0,h-1 do
+    if inGrid(x-1, y+cy) then
+      place(4, x-1, y+cy, 1)
+    end
+    if inGrid(x+w, y+cy) then
+      place(4, x+w, y+cy, 3)
+    end
+  end
+  for cx=0,w-1 do
+    if inGrid(x+cx, y-1) then
+      place(4, x+cx, y-1, 0)
+    end
+    if inGrid(x+cx, y+h) then
+      place(4, x+cx, y+h, 2)
+    end
+  end
+
+  -- Layer 2 of sliders
+  for cy=-1,h do
+    if inGrid(x-2, y+cy) then
+      place(4, x-2, y+cy, 0)
+    end
+    if inGrid(x+w+1, y+cy) then
+      place(4, x+w+1, y+cy, 2)
+    end
+  end
+  for cx=-1,w do
+    if inGrid(x+cx, y-2) then
+      place(4, x+cx, y-2, 1)
+    end
+    if inGrid(x+cx, y+h+1) then
+      place(4, x+cx, y+h+1, 3)
+    end
+  end
+end
+
 function DoToolbarUpdate()
   if type(currentstate) == "string" then
     placecells = false
+  end
+
+  if tools["tool-auto-protect"] then
+    tools["tool-auto-protect"] = false
+
+    if selecting then
+      defend()
+    end
   end
 
   if toolPlaceData.enabled == true then
@@ -371,6 +472,12 @@ function DoToolbarUpdate()
     currentstate = pastcurrentstate
   elseif type(tools[currentstate]) == "boolean" then
     tools[currentstate] = not tools[currentstate]
+    if currentstate == "tool-square" and tools["tool-fill"] then
+      tools["tool-fill"] = false
+    end
+    if currentstate == "tool-fill" and tools["tool-square"] then
+      tools["tool-square"] = false
+    end
     currentstate = pastcurrentstate
   elseif currentstate == "load-struct" then
     local text = love.system.getClipboardText()
@@ -409,14 +516,21 @@ function DoToolbarRender()
     for oy=0,toolPlaceData.h-1 do
       grid[oy] = {}
       for ox=0,toolPlaceData.w-1 do
-        local cx, cy = toolPlaceData.x + ox, toolPlaceData.y + oy
-        if inGrid(cx, cy) then
-          renderCell(id, cx, cy, currentrot)
+        if (ox == 0 or ox == toolPlaceData.w-1 or oy == 0 or oy == toolPlaceData.h-1) or (tools["tool-place-filled"]) then
+          local cx, cy = toolPlaceData.x + ox, toolPlaceData.y + oy
+          if inGrid(cx, cy) then
+            renderCell(id, cx, cy, currentrot)
+          end
+          grid[oy][ox] = {
+            ctype = currentstate,
+            rot = currentrot
+          }
+        else
+          grid[oy][ox] = {
+            ctype = 0,
+            rot = 0,
+          }
         end
-        grid[oy][ox] = {
-          ctype = currentstate,
-          rot = currentrot
-        }
       end
     end
     if id == 0 then
@@ -519,15 +633,15 @@ pushCat:AddItem("Slider", "Can only be pushed from it's sides", 4)
 pushCat:AddItem("One Directional", "Can only be pushed from one side", 5)
 pushCat:AddItem("Two Directional", "Can only be pushed from two sides", 6)
 pushCat:AddItem("Three Directional", "Can only be pushed from three sides", 7)
-pushCat:AddItem("Opposition", "Can be moved from one side, and pulled from the other. Acts like a push cell on the green sides.", 51)
+pushCat:AddItem("Opposition", "Can be moved from one side, and pulled from the other. Acts like a wall cell on the green sides.", 51)
 pushCat:AddItem("Cross Opposition", "Can be moved from two sides, and pulled from the other ones.", 52)
-pushCat:AddItem("Slide Opposition", "Can be moved from one side, and pulled from the other. Rest of the sides make it like a slider", 53)
+pushCat:AddItem("Slide Opposition", "Can be moved from one side, and pulled from the other. Acts like a push cell on the yellow bar slides.", 53)
 
 local genCat = Toolbar:AddCategory("Generators", "Cells that generate other cells", "textures/generator.png")
 genCat:AddItem("Generator", "Generates in front of it the cell behind it", 2)
 genCat:AddItem("Cross Generator", "Two generators combined as one!", 22)
-genCat:AddItem("CW Generator", "Generates on it's right what is behind it", 25)
-genCat:AddItem("CCW Generator", "Generators on it's left what is behind it", 26)
+genCat:AddItem("CW Generator", "Generates on it's right what is behind it. It also applies some rotation", 25)
+genCat:AddItem("CCW Generator", "Generators on it's left what is behind it. It also applies some rotation", 26)
 genCat:AddItem("Replicator", "Generates the cell in front of it... in front of it", 44)
 genCat:AddItem("Cross Replicator", "It's like 2 replicators put together!", 45)
 genCat:AddItem("Twist Generator", "Generates in front of it the opposite of the cell behind it", 39)
@@ -553,7 +667,7 @@ local destroyCat = Toolbar:AddCategory("Destroyers", "Cells that destroy other c
 destroyCat:AddItem("Enemy", "When something goes into it, they both die", 12)
 destroyCat:AddItem("Strong Enemy", "Just like an enemy, but instead of dying, it turns itself into a normal enemy", 23)
 destroyCat:AddItem("Trash", "When something goes into it, it dies. The trash cell remains", 11)
-destroyCat:AddItem("Demolisher", "Trash cell, except instead of just killing what fell into it, it kills everything except itself in a 3x3 area with in in the center.", 50)
+destroyCat:AddItem("Demolisher", "Trash cell, except instead of just killing what fell into it, it kills everything except itself in a 3x3 area with in the center.", 50)
 
 local procCat = Toolbar:AddCategory("Processors", "Cells that can be used to process data", "textures/gate_and.png")
 procCat:AddItem("OR gate", "Performs OR operation on it's data.", 31)
@@ -621,12 +735,23 @@ local toolData = {
     description = "Instead of placing cells you drag",
     id = "tool-square"
   },
+  {
+    title = "Filled Placement",
+    description = "When using square drag placement, fill the insides of the square",
+    id = "tool-place-filled",
+    default = true,
+  },
+  {
+    title = "Automatic Protector",
+    description = "When clicking this, the selected structure will have around it placed blocks to protect it.",
+    id = "tool-auto-protect",
+  },
 }
 
 for _, data in ipairs(toolData) do
   toolsCat:AddItem(data.title, data.description, data.id)
 
-  tools[data.id] = false
+  tools[data.id] = data.default or false
   tex[data.id] = tooltex
   texsize[data.id] = toolsize
 end
