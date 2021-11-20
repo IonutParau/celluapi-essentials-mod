@@ -475,14 +475,14 @@ local function init()
     mechGateCat:AddItem("NOT", "Performs NOT operation", ids.g_not)
 
     local destCat = Toolbar:GetCategory("Destroyers")
-    destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
     destCat:AddItem("Enemy Slider", "Enemy but cells can only fall in from 2 sides", slideEnemy)
     destCat:AddItem("Trash Slider", "Trash but cells can only fall in from 2 sides", slideTrash)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
+    destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
 
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
-    movCat:AddItem("Slide Opener", "Can only open slide cells from the wrong sides", ids.slideopener)
+    movCat:AddItem("Slide Opener", "Can only open slide cells from the immovable sides. Doesn't move slide cells on other sides", ids.slideopener)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides because... because.", ids.gen4)
