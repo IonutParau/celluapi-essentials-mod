@@ -464,7 +464,7 @@ local function init()
     lightBulbCat:AddItem("Brightest Light Bulb", "The brightest light bulb. 19x19", ids.brightestLightBulb)
 
     -- Add gates o no
-    local mechGateCat = mechCat:AddCategory("Mechanical Gates", "Cells that combine inputs to get a processed output", texp .. "gates/and.png")
+    local mechGateCat = mechCat:AddCategory("Mechanical Gates", "Cells that combine 2 inputs from sides to get a processed output out front", texp .. "gates/and.png")
 
     mechGateCat:AddItem("AND", "Performs AND operation", ids.g_and)
     mechGateCat:AddItem("OR", "Performs OR operation", ids.g_or)
@@ -472,11 +472,11 @@ local function init()
     mechGateCat:AddItem("NAND", "Performs NAND operation", ids.g_nand)
     mechGateCat:AddItem("NOR", "Performs NOR operation", ids.g_nor)
     mechGateCat:AddItem("XNOR", "Performs XNOR operation", ids.g_xnor)
-    mechGateCat:AddItem("NOT", "Performs NOT operation", ids.g_not)
+    mechGateCat:AddItem("NOT", "Performs NOT operation. Input on back", ids.g_not)
 
     local destCat = Toolbar:GetCategory("Destroyers")
-    destCat:AddItem("Enemy Slider", "Enemy but cells can only fall in from 2 sides", slideEnemy)
-    destCat:AddItem("Trash Slider", "Trash but cells can only fall in from 2 sides", slideTrash)
+    destCat:AddItem("Enemy Slider", "Acts as an enemy cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideEnemy)
+    destCat:AddItem("Trash Slider", "Acts as a trash cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideTrash)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
 
@@ -485,7 +485,7 @@ local function init()
     movCat:AddItem("Slide Opener", "Can only open slide cells from the immovable sides. Doesn't move slide cells on other sides", ids.slideopener)
 
     local genCat = Toolbar:GetCategory("Generators")
-    genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides because... because.", ids.gen4)
+    genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
 
   end
 end
@@ -655,5 +655,9 @@ return {
   onCellDraw = onCellDraw,
   onPlace = onPlace,
   customdraw = customdraw,
+<<<<<<< HEAD
   onTrashEats = onTrashEats,
 }
+=======
+}
+>>>>>>> 8967a05f0b48f4061d7bd5e0b50fe3c1b3b93f3d
