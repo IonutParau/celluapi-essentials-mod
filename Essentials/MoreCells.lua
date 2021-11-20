@@ -655,9 +655,5 @@ return {
   onCellDraw = onCellDraw,
   onPlace = onPlace,
   customdraw = customdraw,
-<<<<<<< HEAD
   onTrashEats = onTrashEats,
 }
-=======
-}
->>>>>>> 8967a05f0b48f4061d7bd5e0b50fe3c1b3b93f3d
