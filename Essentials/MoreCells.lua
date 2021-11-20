@@ -204,6 +204,11 @@ local function DoActivator(x, y)
       end
     end
   end
+
+  cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
+  if isMechOn(x, y) then
+    cells[y][x].mech_signal = cells[y][x].mech_signal - 1
+  end
 end
 
 local function DoDelayer(x, y)
@@ -400,10 +405,10 @@ local function init()
   ids.activator = addCell("EMC mech activator", texp .. "activator.png", Options.neverupdate)
   ids.piston = addCell("EMC mech piston", texp .. "piston/off.png", Options.neverupdate)
   ids.stickyPiston = addCell("EMC mech piston-sticky", texp .. "piston/sticky-off.png", Options.neverupdate)
-  ids.lightBulb = addCell("EMC mech light-bulb", "textures/push.png", Options.static)
-  ids.brightLightBulb = addCell("EMC mech light-bulb-bright", "textures/push.png", Options.static)
-  ids.brighterLightBulb = addCell("EMC mech light-bulb-brighter", "textures/push.png", Options.static)
-  ids.brightestLightBulb = addCell("EMC mech light-bulb-brightest", "textures/push.png", Options.static)
+  ids.lightBulb = addCell("EMC mech light-bulb", texp .. "lightbulbs/normal.png", Options.static)
+  ids.brightLightBulb = addCell("EMC mech light-bulb-bright", texp .. "lightbulbs/bright.png", Options.static)
+  ids.brighterLightBulb = addCell("EMC mech light-bulb-brighter", texp .. "lightbulbs/brighter.png", Options.static)
+  ids.brightestLightBulb = addCell("EMC mech light-bulb-brightest", texp .. "lightbulbs/brightest.png", Options.static)
   ids.slideopener = addCell("EMC mech slideopener", texp .. "slideopener.png", Options.mover)
   ids.crosswire = addCell("EMC mech crosswire", "textures/push.png", Options.neverupdate)
 
@@ -422,10 +427,10 @@ local function init()
   giveSubtick(ids.stickyPiston, DoModded)
 
   -- Add useful stuff
-  local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash"})
+  local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash", dontupdate = true})
   SetSidedTrash(slideTrash, slideCallback)
 
-  local slideEnemy = addCell("EMC slide-enemy", texp .. "enemy_side.png", {type="sideenemy"})
+  local slideEnemy = addCell("EMC slide-enemy", texp .. "enemy_side.png", {type="sideenemy", dontupdate = true})
   SetSidedEnemy(slideEnemy, slideCallback)
 
   ids.trashMover = addCell("EMC trash-mover", texp .. "trashMove.png", Options.sidetrash)
@@ -437,19 +442,21 @@ local function init()
 
   ids.gen4 = addCell("EMC gen4", texp .. "4waygen.png")
 
+  ids.silentTrash = addCell("EMC silent-trash", texp .. "silentTrash.png", Options.combine(Options.trash, Options.neverupdate))
+
   if Toolbar then
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
 
-    mechCat:AddItem("Motion Sensor", "Senses motion", ids.motionSensor)
-    mechCat:AddItem("Wire", "Can spread mechanical signals further", ids.wire)
-    mechCat:AddItem("CrossWire", "CrossWire", ids.crosswire)
-    mechCat:AddItem("Activator", "Acts like a freezer until recieving mechanical signal", ids.activator)
-    mechCat:AddItem("Delayer", "It's like a slow wire", ids.delayer)
-    mechCat:AddItem("Piston", "When it recieved a mechanical signal, it pushes a cell back", ids.piston)
-    mechCat:AddItem("Sticky Piston", "When it recieved a mechanical signal, it pushes a cell back. When that signal stops, it pulls it back", ids.stickyPiston)
-    mechCat:AddItem("Mechanical Generator", "Constantly generaters mechanical signals", ids.mech_gen)
+    mechCat:AddItem("Motion Sensor", "Senses motion. If it detects motion, it outputs a mechanical signal", ids.motionSensor)
+    mechCat:AddItem("Wire", "Extends mechanical signals further", ids.wire)
+    mechCat:AddItem("CrossWire", "Acts as a wire while keeping 2 signals seperated", ids.crosswire)
+    mechCat:AddItem("Activator", "Acts like a freezer while not recieving a mechanical signal", ids.activator)
+    mechCat:AddItem("Delayer", "It's like a slow wire, delaying a mechanical signal 1 tick", ids.delayer)
+    mechCat:AddItem("Piston", "When it recieves a mechanical signal, it pushes the cell in front of the piston", ids.piston)
+    mechCat:AddItem("Sticky Piston", "When it recieves a mechanical signal, it pushes a cell. When that signal stops, the piston pulls that cell back", ids.stickyPiston)
+    mechCat:AddItem("Mechanical Generator", "Constantly generaters mechanical signals in all directions", ids.mech_gen)
 
-    local lightBulbCat = mechCat:AddCategory("Light Bulbs", "Turn them on and they light up all cells around them!", "textures/menu.png")
+    local lightBulbCat = mechCat:AddCategory("Light Bulbs", "Turn them on and they light up all cells around them!", texp .. "lightbulbs/brightest.png")
 
     lightBulbCat:AddItem("Light Bulb", "Average light bulb. 5x5", ids.lightBulb)
     lightBulbCat:AddItem("Bright Light Bulb", "Bright light bulb. 7x7", ids.brightLightBulb)
@@ -468,9 +475,11 @@ local function init()
     mechGateCat:AddItem("NOT", "Performs NOT operation", ids.g_not)
 
     local destCat = Toolbar:GetCategory("Destroyers")
+    destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
     destCat:AddItem("Enemy Slider", "Enemy but cells can only fall in from 2 sides", slideEnemy)
     destCat:AddItem("Trash Slider", "Trash but cells can only fall in from 2 sides", slideTrash)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
+
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "Can only open slide cells from the wrong sides", ids.slideopener)
@@ -633,6 +642,11 @@ local function customdraw()
   end
 end
 
+local function onTrashEats(id, x, y, food, fx, fy)
+  if id == ids.silentTrash then
+    destroysound:stop()
+  end
+end
 
 return {
   init = init,
@@ -641,4 +655,5 @@ return {
   onCellDraw = onCellDraw,
   onPlace = onPlace,
   customdraw = customdraw,
+  onTrashEats = onTrashEats,
 }

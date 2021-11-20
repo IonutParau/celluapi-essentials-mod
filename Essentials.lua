@@ -132,6 +132,12 @@ local function tick()
   end
 end
 
+local function onTrashEats(id, x, y, food, fx, fy)
+  if Ereturns.MoreCells then
+    Ereturns.MoreCells.onTrashEats(id, x, y, food, fx, fy)
+  end
+end
+
 return {
   init = init,
   customupdate = customupdate,
@@ -141,6 +147,7 @@ return {
   onPlace = onPlace,
   onMousePressed = onMousePressed,
   onMouseReleased = onMouseReleased,
+  onTrashEats = onTrashEats,
   tick = tick,
   version = ver,
   dependencies = {
