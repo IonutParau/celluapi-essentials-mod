@@ -440,14 +440,14 @@ local function init()
   if Toolbar then
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
 
-    mechCat:AddItem("Motion Sensor", "Senses motion", ids.motionSensor)
-    mechCat:AddItem("Wire", "Can spread mechanical signals further", ids.wire)
-    mechCat:AddItem("CrossWire", "CrossWire", ids.crosswire)
-    mechCat:AddItem("Activator", "Acts like a freezer until recieving mechanical signal", ids.activator)
-    mechCat:AddItem("Delayer", "It's like a slow wire", ids.delayer)
-    mechCat:AddItem("Piston", "When it recieved a mechanical signal, it pushes a cell back", ids.piston)
-    mechCat:AddItem("Sticky Piston", "When it recieved a mechanical signal, it pushes a cell back. When that signal stops, it pulls it back", ids.stickyPiston)
-    mechCat:AddItem("Mechanical Generator", "Constantly generaters mechanical signals", ids.mech_gen)
+    mechCat:AddItem("Motion Sensor", "Senses motion. If it detects motion, it outputs a mechanical signal", ids.motionSensor)
+    mechCat:AddItem("Wire", "Extends mechanical signals further", ids.wire)
+    mechCat:AddItem("CrossWire", "Acts as a wire while keeping 2 signals seperated", ids.crosswire)
+    mechCat:AddItem("Activator", "Acts like a freezer while not recieving a mechanical signal", ids.activator)
+    mechCat:AddItem("Delayer", "It's like a slow wire, delaying a mechanical signal 1 tick", ids.delayer)
+    mechCat:AddItem("Piston", "When it recieves a mechanical signal, it pushes the cell in front of the piston", ids.piston)
+    mechCat:AddItem("Sticky Piston", "When it recieves a mechanical signal, it pushes a cell. When that signal stops, the piston pulls that cell back", ids.stickyPiston)
+    mechCat:AddItem("Mechanical Generator", "Constantly generaters mechanical signals in all directions", ids.mech_gen)
 
     local lightBulbCat = mechCat:AddCategory("Light Bulbs", "Turn them on and they light up all cells around them!", "textures/menu.png")
 
@@ -457,7 +457,7 @@ local function init()
     lightBulbCat:AddItem("Brightest Light Bulb", "The brightest light bulb. 19x19", ids.brightestLightBulb)
 
     -- Add gates o no
-    local mechGateCat = mechCat:AddCategory("Mechanical Gates", "Cells that combine inputs to get a processed output", texp .. "gates/and.png")
+    local mechGateCat = mechCat:AddCategory("Mechanical Gates", "Cells that combine 2 inputs from sides to get a processed output out front", texp .. "gates/and.png")
 
     mechGateCat:AddItem("AND", "Performs AND operation", ids.g_and)
     mechGateCat:AddItem("OR", "Performs OR operation", ids.g_or)
@@ -465,18 +465,18 @@ local function init()
     mechGateCat:AddItem("NAND", "Performs NAND operation", ids.g_nand)
     mechGateCat:AddItem("NOR", "Performs NOR operation", ids.g_nor)
     mechGateCat:AddItem("XNOR", "Performs XNOR operation", ids.g_xnor)
-    mechGateCat:AddItem("NOT", "Performs NOT operation", ids.g_not)
+    mechGateCat:AddItem("NOT", "Performs NOT operation. Input on back", ids.g_not)
 
     local destCat = Toolbar:GetCategory("Destroyers")
-    destCat:AddItem("Enemy Slider", "Enemy but cells can only fall in from 2 sides", slideEnemy)
-    destCat:AddItem("Trash Slider", "Trash but cells can only fall in from 2 sides", slideTrash)
+    destCat:AddItem("Enemy Slider", "Acts as an enemy cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideEnemy)
+    destCat:AddItem("Trash Slider", "Acts as a trash cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideTrash)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
-    movCat:AddItem("Slide Opener", "Can only open slide cells from the wrong sides", ids.slideopener)
+    movCat:AddItem("Slide Opener", "Can only open slide cells from the immovable sides. Doesn't move slide cells on other sides", ids.slideopener)
 
     local genCat = Toolbar:GetCategory("Generators")
-    genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides because... because.", ids.gen4)
+    genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
 
   end
 end
