@@ -10,7 +10,11 @@ local settings = {}
 local mouse
 
 local animations = {}
-local animCounter = 0
+local animCounter = {
+  tick = 0,
+  ms = 0,
+  frame = 0,
+}
 
 local originalTex = {}
 local originalSize = {}
@@ -27,6 +31,8 @@ local function Animation()
     imgs = {},
     current = 1,
     interval = 0,
+    time = "tick",
+    t = 0,
     type = "override",
   }
 end
@@ -80,6 +86,8 @@ end
 local function loadResource(path)
   path = path or "Essentials/Resources"
   local code = json.decode(love.filesystem.read(path), 0, 'null')
+
+  --if not code then return end
 
   local vars = code["vars"] or {}
 
@@ -147,6 +155,7 @@ local function loadResource(path)
         anim.interval = interval
         anim.imgs = textures
         anim.type = image["type"] or "override"
+        anim.time = image["time"] or "tick"
         animations[Resourcer.FromIdentifier(key)] = anim
       end
     end
@@ -226,8 +235,6 @@ function Resourcer.RenderMouse()
 end
 
 function Resourcer.LoadResources(path)
-  originalTex = CopyTable(tex)
-  originalSize = CopyTable(texsize)
   settings.run_path = path
   local resources = love.filesystem.getDirectoryItems(path)
 
@@ -238,40 +245,50 @@ function Resourcer.LoadResources(path)
 		end
   end
 
+  originalTex = CopyTable(tex)
+  originalSize = CopyTable(texsize)
+
   originalOverlays = CopyTable(overlays)
   originalOverlaySize = CopyTable(overlaySize)
 end
 
-function Resourcer.UpdateAnimations()
-  animCounter = animCounter + 1
-  for rawid, animation in pairs(animations) do
-    local canRun, id = Resourcer.FromSmartIdentifier(rawid)
-    if canRun then
-      local texture = animation.imgs[animation.current]
-      if animation.type == "overlay" then
-        id = tostring(id)
-        overlays[id] = texture.image
-        overlaySize[id] = texture.size
-      else
-        tex[id] = texture.image
-        texsize[id] = texture.size
-      end
-
-      if animCounter % (animation.interval) == 0 then
-        animation.current = animation.current + 1
-        if animation.current > #(animation.imgs) then
-          animation.current = 1
-        end
-      end
+function doAnimation(rawid, animation, time)
+  local canRun, id = Resourcer.FromSmartIdentifier(rawid)
+  if canRun then
+    local texture = animation.imgs[animation.current]
+    if animation.type == "overlay" then
+      id = tostring(id)
+      overlays[id] = texture.image
+      overlaySize[id] = texture.size
     else
-      if animation.type == "overlay" then
-        id = tostring(id)
-        overlays[id] = originalOverlays[id]
-        overlaySize[id] = originalOverlaySize[id]
-      else
-        tex[id] = originalTex[id]
-        texsize[id] = originalSize[id]
+      tex[id] = texture.image
+      texsize[id] = texture.size
+    end
+    animation.t = animation.t + time
+    while animation.t > animation.interval do
+      animation.current = animation.current + 1
+      animation.t = animation.t - animation.interval
+      if animation.current > #(animation.imgs) then
+        animation.current = 1
       end
+    end
+  else
+    if animation.type == "overlay" then
+      id = tostring(id)
+      overlays[id] = originalOverlays[id]
+      overlaySize[id] = originalOverlaySize[id]
+    else
+      tex[id] = originalTex[id]
+      texsize[id] = originalSize[id]
+    end
+  end
+end
+
+function Resourcer.UpdateAnimations(type, duration)
+  --animCounter.tick = animCounter.tick + 1
+  for rawid, animation in pairs(animations) do
+    if animation.time == type then
+      doAnimation(rawid, animation, duration)
     end
   end
 end

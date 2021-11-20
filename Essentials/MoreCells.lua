@@ -9,6 +9,28 @@ local half_pi = math.pi / 2
 
 local MAX_MECH = 2
 
+local function equals(a, b)
+  if type(a) ~= type(b) then return false end
+
+  if type(a) == "table" then
+    for k, v in pairs(a) do
+      if not equals(b[k], v) then
+        return false
+      end
+    end
+
+    for k, v in pairs(b) do
+      if not equals(a[k], v) then
+        return false
+      end
+    end
+
+    return true
+  else
+    return a == b
+  end
+end
+
 local function makeTex(pic)
   local t = love.graphics.newImage(pic)
   return {
@@ -80,7 +102,7 @@ end
 local function isConnectable(cell, dir)
   local id = cell.ctype
 
-  local rdir = dir - cell.rot
+  local rdir = (dir - cell.rot) % 4
 
   if isMech(id) then
     if id == ids.wire or id == ids.activator or id == ids.mech_gen then
@@ -94,6 +116,8 @@ local function isConnectable(cell, dir)
     if id == ids.delayer then
       return rdir % 2 == 0
     end
+
+    return true
   elseif isGate(id) then
     if id == ids.g_not then
       return rdir % 2 == 0
@@ -139,7 +163,12 @@ function SignalMechanical(x, y, blockdir, forced)
         canSpread = (cells[y][x].ctype == ids.wire)
       end
       if isMech(cells[oy][ox].ctype) and isConnectable(cells[oy][ox], i) and canSpread and ((cells[oy][ox].mech_signal or 0) < MAX_MECH) then
-        SignalMechanical(ox, oy, nil, false)
+        if cells[oy][ox].ctype == ids.crosswire then
+          local fx, fy = GetFullForward(ox, oy, i)
+          SignalMechanical(fx, fy, (i+2)%4, true)
+        else
+          SignalMechanical(ox, oy, nil, false)
+        end
       end
     end
   end
@@ -157,7 +186,7 @@ local function DoMotionSensor(x, y, dir)
   local past = cells[y][x].motion_past_cell
   local now = cells[oy][ox]
 
-  if past.ctype ~= now.ctype or past.rot ~= now.rot then
+  if not equals(past, now) and not equals(now.lastvars, past.lastvars) then
     cells[y][x].motion_past_cell = CopyTable(cells[oy][ox])
     SignalMechanical(x, y)
   end
@@ -371,6 +400,12 @@ local function init()
   ids.activator = addCell("EMC mech activator", texp .. "activator.png", Options.neverupdate)
   ids.piston = addCell("EMC mech piston", texp .. "piston/off.png", Options.neverupdate)
   ids.stickyPiston = addCell("EMC mech piston-sticky", texp .. "piston/sticky-off.png", Options.neverupdate)
+  ids.lightBulb = addCell("EMC mech light-bulb", "textures/push.png", Options.static)
+  ids.brightLightBulb = addCell("EMC mech light-bulb-bright", "textures/push.png", Options.static)
+  ids.brighterLightBulb = addCell("EMC mech light-bulb-brighter", "textures/push.png", Options.static)
+  ids.brightestLightBulb = addCell("EMC mech light-bulb-brightest", "textures/push.png", Options.static)
+  ids.slideopener = addCell("EMC mech slideopener", texp .. "slideopener.png", Options.mover)
+  ids.crosswire = addCell("EMC mech crosswire", "textures/push.png", Options.neverupdate)
 
   -- Add gates
   ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
@@ -382,7 +417,7 @@ local function init()
   ids.g_not = addCell("EMC gate not", texp .. "gates/not.png", Options.neverupdate)
 
   table.insert(subticks, GenerateSubtick({ ids.g_and, ids.g_or, ids.g_xor, ids.g_nand, ids.g_nor, ids.g_xnor, ids.g_not }, DoModded, true))
-  table.insert(subticks, 4, GenerateSubtick(ids.activator, DoActivator, true))
+  table.insert(subticks, 1, GenerateSubtick(ids.activator, DoActivator, true))
   giveSubtick(ids.piston, DoModded)
   giveSubtick(ids.stickyPiston, DoModded)
 
@@ -407,11 +442,19 @@ local function init()
 
     mechCat:AddItem("Motion Sensor", "Senses motion", ids.motionSensor)
     mechCat:AddItem("Wire", "Can spread mechanical signals further", ids.wire)
+    mechCat:AddItem("CrossWire", "CrossWire", ids.crosswire)
     mechCat:AddItem("Activator", "Acts like a freezer until recieving mechanical signal", ids.activator)
     mechCat:AddItem("Delayer", "It's like a slow wire", ids.delayer)
     mechCat:AddItem("Piston", "When it recieved a mechanical signal, it pushes a cell back", ids.piston)
     mechCat:AddItem("Sticky Piston", "When it recieved a mechanical signal, it pushes a cell back. When that signal stops, it pulls it back", ids.stickyPiston)
     mechCat:AddItem("Mechanical Generator", "Constantly generaters mechanical signals", ids.mech_gen)
+
+    local lightBulbCat = mechCat:AddCategory("Light Bulbs", "Turn them on and they light up all cells around them!", "textures/menu.png")
+
+    lightBulbCat:AddItem("Light Bulb", "Average light bulb. 5x5", ids.lightBulb)
+    lightBulbCat:AddItem("Bright Light Bulb", "Bright light bulb. 7x7", ids.brightLightBulb)
+    lightBulbCat:AddItem("Brighter Light Bulb", "Brighter light bulb. 11x11", ids.brighterLightBulb)
+    lightBulbCat:AddItem("Brightest Light Bulb", "The brightest light bulb. 19x19", ids.brightestLightBulb)
 
     -- Add gates o no
     local mechGateCat = mechCat:AddCategory("Mechanical Gates", "Cells that combine inputs to get a processed output", texp .. "gates/and.png")
@@ -430,6 +473,7 @@ local function init()
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
+    movCat:AddItem("Slide Opener", "Can only open slide cells from the wrong sides", ids.slideopener)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides because... because.", ids.gen4)
@@ -440,6 +484,56 @@ end
 local function DoPiston(x, y, dir)
   if isMechOn(x, y) then
     PushCell(x, y, dir)
+  end
+end
+
+local function DoLightbulb(x, y)
+  if isMechOn(x, y) then
+    local spos = calculateScreenPosition(x, y)
+    local radius = 5
+
+    local id = cells[y][x].ctype
+
+    if id == ids.brightLightBulb then
+      radius = 7
+    elseif id == ids.brighterLightBulb then
+      radius = 13
+    elseif id == ids.brightestLightBulb then
+      radius = 19
+    end
+
+    if spos.x > -radius*zoom or spos.y > -radius*zoom or spos.x < love.graphics.getWidth()-radius*zoom or spos.y < love.graphics.getHeight()-radius*zoom then
+
+      local r, g, b, a = love.graphics.getColor()
+
+      love.graphics.setColor(1, 1, 1, 0.01)
+      for rds=1, radius, 0.2 do
+        -- local dx = spos.x - love.graphics.getWidth()/2
+        -- local dy = spos.y - love.graphics.getHeight()/2
+        -- local dist2 = math.abs(dx * dx + dy * dy)
+        if spos.x > -rds*zoom or spos.y > -rds*zoom or spos.x < love.graphics.getWidth()-rds*zoom or spos.y < love.graphics.getHeight()-rds*zoom then
+          love.graphics.circle("fill", spos.x, spos.y, zoom*rds)
+        end
+      end
+      love.graphics.setColor(r, g, b, a)
+    end
+  end
+end
+
+function DoSlideOpener(x, y, dir)
+  local fx, fy = GetFullForward(x, y, dir)
+  local nfx, nfy = GetFullForward(fx, fy, dir)
+  local bx, by = GetFullForward(x, y, dir, -1)
+
+  if cells[fy][fx].ctype == 4 then
+    cells[fy][fx].rot = (cells[fy][fx].rot + 1) % 4
+    if PushCell(bx, by, dir, true, 0) then
+      cells[nfy][nfx].rot = (cells[nfy][nfx].rot - 1) % 4
+    else
+      cells[fy][fx].rot = (cells[fy][fx].rot - 1) % 4
+    end
+  else
+    DoMover(x, y, dir)
   end
 end
 
@@ -474,6 +568,8 @@ local function update(id, x, y, dir)
     cells[y][x].testvar = cells[y][x].mech_signal
   elseif id == ids.gen4 then
     Do4Gen(x, y)
+  elseif id == ids.slideopener then
+    DoSlideOpener(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -524,6 +620,19 @@ local function onPlace(id, x, y, rot)
   cells[y][x].mech_signal = 0
 end
 
+local function customdraw()
+  if not inmenu then
+    for x=1,width-1 do
+      for y=1,height-1 do
+        local id = cells[y][x].ctype
+        if cells[y][x].ctype == ids.lightBulb or id == ids.brightLightBulb or id == ids.brighterLightBulb or id == ids.brightestLightBulb then
+          DoLightbulb(x, y)
+        end
+      end
+    end
+  end
+end
+
 
 return {
   init = init,
@@ -531,4 +640,5 @@ return {
   tick = tick,
   onCellDraw = onCellDraw,
   onPlace = onPlace,
+  customdraw = customdraw,
 }

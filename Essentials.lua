@@ -58,7 +58,7 @@ local function customupdate(dt)
     atime = atime + dt
     if atime > delay then
       atime = 0
-      Resourcer.UpdateAnimations()
+      Resourcer.UpdateAnimations('tick', 1)
     end
   end
   runCustomComponentCallback('update', dt)
@@ -76,9 +76,14 @@ local function customdraw()
     end
     Resourcer.RenderListOverlays()
     Resourcer.RenderMouse()
+    Resourcer.UpdateAnimations('ms', love.timer.getDelta() * 1000)
+    Resourcer.UpdateAnimations('frame', 1)
     if copied and pasting then
       Resourcer.RenderMiniGridOverlay(copied)
     end
+  end
+  if Ereturns.MoreCells then
+    Ereturns.MoreCells.customdraw()
   end
   runCustomComponentCallback('draw', love.timer.getDelta())
 end
@@ -99,6 +104,9 @@ local function update(id, x, y, dir)
 end
 
 local function onMousePressed(x, y)
+  if Toolbar then
+    ToolbarClickTools("press", x, y)
+  end
   runCustomComponentCallback("click", "press", x, y)
 end
 

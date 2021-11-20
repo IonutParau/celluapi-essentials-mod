@@ -7,6 +7,16 @@ if IsEssentials == true then
   texp = "Essentials/" .. texp
 end
 
+local toolsCat = {}
+
+local tooltex = love.graphics.newImage(texp .. "tool.png")
+local toolsize = {
+  w = tooltex:getWidth(),
+  h = tooltex:getHeight(),
+  w2 = tooltex:getWidth()/2,
+  h2 = tooltex:getHeight()/2,
+}
+
 local backp = texp .. "back.png"
 local structures = {}
 
@@ -345,6 +355,13 @@ function ToolbarClickTools(clickType, x, y)
     end
     toolPlaceData.enabled = false
   end
+  -- I'm sorry uku1928
+  -- if clickType == "press" then
+  --   if x > 420 and x < 420 + (40/toolsize.w) and y > 350 and y < 350 + (40/toolsize.h) then
+  --     current = toolsCat
+  --     placecells = false
+  --   end
+  -- end
 end
 
 local function empty(x, y)
@@ -465,10 +482,12 @@ function DoToolbarUpdate()
   elseif type(currentstate) == "string" and string.sub(currentstate, 1, 10) == "structure-" then
     ToolbarSystem.ActivateStructure(structures[currentstate])
     currentstate = pastcurrentstate
-  elseif currentstate == "save-struct" and copied then
-    local s = ToolbarSystem.FromCopyToStructure()
-    local text = json.encode(s)
-    love.system.setClipboardText(text)
+  elseif currentstate == "save-struct" then
+    if copied then
+      local s = ToolbarSystem.FromCopyToStructure()
+      local text = json.encode(s)
+      love.system.setClipboardText(text)
+    end
     currentstate = pastcurrentstate
   elseif type(tools[currentstate]) == "boolean" then
     tools[currentstate] = not tools[currentstate]
@@ -503,11 +522,12 @@ local function renderCell(id, x, y, rot)
 end
 
 function DoToolbarRender()
-  if inmenu then return end
   local x = love.mouse.getX()/winxm
   local y = love.mouse.getY()/winym
 
-  if toolPlaceData.enabled == true then
+  --love.graphics.draw(tooltex, 420, 350, 0, 40/toolsize.w, 40/toolsize.h) -- Sorry uku1928
+
+  if toolPlaceData.enabled == true and not inmenu then
     local grid = {}
     local id = currentstate
     if toolPlaceData.destroy then
@@ -568,7 +588,7 @@ function DoToolbarRender()
     end
   end
 
-  if y > 575-20*(winxm/winym) and y < 575+20*(winxm/winym) then
+  if y > 575-20*(winxm/winym) and y < 575+20*(winxm/winym) and not inmenu then
     for i=0,15 do
       if (x > 5+(775-25)*i/15 and x < 45+(775-25)*i/15 and listorder[i+16*(page-1)+1]) then
         local li = listorder[i+16*(page-1)+1]
@@ -690,15 +710,7 @@ uniqueCat:AddItem("Intaker", "Destroyes the cell in front of it", 43)
 uniqueCat:AddItem("Fungal", "It turns every cell pushing it into itself", 46)
 uniqueCat:AddItem("Flipper", "Turns certain cells around it into their opposites. If they have no opposites, it rotates them instead!", 29)
 
-local tooltex = love.graphics.newImage(texp .. "tool.png")
-local toolsize = {
-  w = tooltex:getWidth(),
-  h = tooltex:getHeight(),
-  w2 = tooltex:getWidth()/2,
-  h2 = tooltex:getHeight()/2,
-}
-
-local toolsCat = Toolbar:AddCategory("Tools", "Kind of like settings", texp .. "tool.png")
+toolsCat = Toolbar:AddCategory("Tools", "Kind of like settings", texp .. "tool.png")
 
 
 local structCat = toolsCat:AddCategory("Structures", "When you click on these cells you will suddenly have a structure you can place on the grid", texp .. "structure.png")
@@ -728,23 +740,27 @@ local toolData = {
   {
     title = "Fill",
     description = "When placing a cell it fills all the empty space around it with that cell",
-    id = "tool-fill"
+    id = "tool-fill",
+    tex = texp .. "Tools/fill.png",
   },
   {
     title = "Square Drag Placement",
     description = "Instead of placing cells you drag",
-    id = "tool-square"
+    id = "tool-square",
+    tex = texp .. "Tools/square.png",
   },
   {
     title = "Filled Placement",
     description = "When using square drag placement, fill the insides of the square",
     id = "tool-place-filled",
     default = true,
+    tex = texp .. "Tools/square_fill.png",
   },
   {
     title = "Automatic Protector",
     description = "When clicking this, the selected structure will have around it placed blocks to protect it.",
     id = "tool-auto-protect",
+    tex = texp .. "Tools/auto_protect.png",
   },
 }
 
@@ -752,8 +768,19 @@ for _, data in ipairs(toolData) do
   toolsCat:AddItem(data.title, data.description, data.id)
 
   tools[data.id] = data.default or false
-  tex[data.id] = tooltex
-  texsize[data.id] = toolsize
+  if data.tex == nil then
+    tex[data.id] = tooltex
+    texsize[data.id] = toolsize
+  else
+    local img = love.graphics.newImage(data.tex)
+    tex[data.id] = img
+    texsize[data.id] = {
+      w = img:getWidth(),
+      h = img:getHeight(),
+      w2 = img:getWidth()/2,
+      h2 = img:getHeight()/2,
+    }
+  end
 end
 
 local arial = love.graphics.newFont(fontp, 16)
