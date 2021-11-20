@@ -426,6 +426,8 @@ local function init()
   giveSubtick(ids.piston, DoModded)
   giveSubtick(ids.stickyPiston, DoModded)
 
+  ids.fan = addCell("EMC fan", texp .. "fan.png")
+
   -- Add useful stuff
   local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash", dontupdate = true})
   SetSidedTrash(slideTrash, slideCallback)
@@ -483,6 +485,7 @@ local function init()
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "Can only open slide cells from the immovable sides. Doesn't move slide cells on other sides", ids.slideopener)
+    movCat:AddItem("Fan", "Pushes cells in front of it constantly", ids.fan)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
@@ -579,6 +582,8 @@ local function update(id, x, y, dir)
     Do4Gen(x, y)
   elseif id == ids.slideopener then
     DoSlideOpener(x, y, dir)
+  elseif id == ids.fan then
+    PushCell(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
