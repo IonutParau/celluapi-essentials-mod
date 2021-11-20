@@ -268,7 +268,7 @@ local function dofill(id, x, y, rot, original, ox, oy)
     return
   end
 
-  if (cells[oy][ox].ctype == original.ctype) and (cells[oy][ox].rot == original.rot) then
+  if ((cells[oy][ox].ctype == original.ctype) and (cells[oy][ox].rot == original.rot)) or (cells[oy][ox].ctype == original.ctype and original.ctype == 0) then
     local original = CopyTable(cells[oy][ox])
     cells[oy][ox].ctype = id
     cells[oy][ox].rot = rot
