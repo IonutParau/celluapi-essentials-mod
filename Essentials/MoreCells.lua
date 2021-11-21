@@ -296,12 +296,50 @@ local function Do4Gen(x, y)
     local f = walkDivergedPath(x, y, fx, fy)
     fx = f.x
     fy = f.y
+    local bx, by = GetFullForward(x, y, dir, -1)
+    local b = walkDivergedPath(x, y, bx, by)
+    bx = b.x
+    by = b.y
     local back = backWorks[dir]
-    if back.ctype ~= 0 and back.ctype ~= 40 then
+    local canGen = true
+    if back.ctype > initialCellCount then
+      canGen = CanGenCell(cells[y][x].ctype, x, y, back.ctype, bx, by, dir)
+    end
+    if back.ctype ~= 0 and back.ctype ~= 40 and canGen then
       local bdir = (back.rot + f.dir - dir) % 4
       if PushCell(x, y, dir, true, 1, back.ctype, bdir, nil, {x, y, bdir}) then
         if cells[fy][fx].ctype == 19 then cells[fy][fx].ctype = 0 end
         if cells[fy][fx].ctype == ids.gen4 then cells[fy][fx].updated = true end
+      end
+    end
+  end
+end
+
+local function Do4Rep(x, y)
+  for dir=0,3 do
+    local fx, fy = GetFullForward(x, y, dir)
+    local ffx, ffy = GetFullForward(x, y, dir, 2)
+
+    local f = walkDivergedPath(x, y, fx, fy)
+    fx = f.x
+    fy = f.y
+    local ff = walkDivergedPath(x, y, ffx, ffy)
+    ffx = ff.x
+    ffy = ff.y
+
+    local front = cells[fy][fx]
+
+    local fdir = (front.rot - f.dir + dir) % 4
+
+    local canGen = true
+    if front.ctype > initialCellCount then
+      canGen = CanGenCell(cells[y][x].ctype, x, y, front.ctype, fx, fy, dir)
+    end
+
+    if front.ctype ~= 0 and front.ctype ~= 40 and canGen then
+      PushCell(x, y, dir, true, 1, front.ctype, fdir, nil, {x, y, fdir})
+      if front.ctype == 19 then
+        cells[fy][fx].ctype = 0
       end
     end
   end
@@ -443,6 +481,7 @@ local function init()
   end)
 
   ids.gen4 = addCell("EMC gen4", texp .. "4waygen.png")
+  ids.rep4 = addCell("EMC rep4", texp .. "4wayrep.png")
 
   ids.silentTrash = addCell("EMC silent-trash", texp .. "silentTrash.png", Options.combine(Options.trash, Options.neverupdate))
 
@@ -489,6 +528,7 @@ local function init()
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
+    genCat:AddItem("4-way Replicator", "Replicates stuff on all 4 sides.", ids.rep4)
 
   end
 end
@@ -580,6 +620,8 @@ local function update(id, x, y, dir)
     cells[y][x].testvar = cells[y][x].mech_signal
   elseif id == ids.gen4 then
     Do4Gen(x, y)
+  elseif id == ids.rep4 then
+    Do4Rep(x, y)
   elseif id == ids.slideopener then
     DoSlideOpener(x, y, dir)
   elseif id == ids.fan then

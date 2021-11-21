@@ -212,12 +212,14 @@ end
 ---@param textures table The table of frames (aka textures) to animate with
 ---@param interval number How long (in ticks) does the frame in the animation last
 ---@param type "\"override\""|"\"overlay\"" Optional - The type of animation.
+---@param time "\"tick\""|"\"ms\""|"\"frame\"" Optional - The time format of the interval.
 ---@return Resourcer.Animation
-function Resourcer.createAnimation(id, textures, interval, type)
+function Resourcer.createAnimation(id, textures, interval, type, time)
   local anim = Animation()
   anim.interval = interval
   anim.imgs = textures
   anim.type = type or "override"
+  anim.time = time or "tick"
   animations[Resourcer.FromIdentifier(id)] = anim
 
   return anim
