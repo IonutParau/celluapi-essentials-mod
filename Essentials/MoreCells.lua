@@ -572,17 +572,60 @@ local function DoLightbulb(x, y)
   end
 end
 
+local function restoreRotations(rotations, x, y, dir, id, ar)
+  local fx, fy = x, y
+
+  for i=1,#rotations do
+    local lx, ly = fx, fy
+    fx, fy = GetFullForward(fx, fy, dir)
+
+    local f = walkDivergedPath(lx, ly, fx, fy)
+    fx = f.x
+    fy = f.y
+    local odir = dir
+    dir = f.dir
+    local appliedRot = dir - odir
+
+    if cells[fy][fx].ctype == id then
+      cells[fy][fx].rot = rotations[i] + appliedRot + ar
+    end
+  end
+end
+
 function DoSlideOpener(x, y, dir)
   local fx, fy = GetFullForward(x, y, dir)
-  local nfx, nfy = GetFullForward(fx, fy, dir)
-  local bx, by = GetFullForward(x, y, dir, -1)
+  local f = walkDivergedPath(x, y, fx, fy)
+  fx = f.x
+  fy = f.y
+  local appliedRot = f.dir - dir
 
   if cells[fy][fx].ctype == 4 then
-    cells[fy][fx].rot = (cells[fy][fx].rot + 1) % 4
+    local originalRots = {}
+    -- Get rots
+    local cx, cy = GetFullForward(x, y, dir)
+    local c = walkDivergedPath(x, y, cx, cy)
+    cx = c.x
+    cy = c.y
+    local cdir = c.dir
+    repeat
+      table.insert(originalRots, cells[cy][cx].rot)
+      if cells[cy][cx].ctype == 4 then
+        cells[cy][cx].rot = (cells[cy][cx].rot + 1) % 4
+      end
+      local lx, ly = cx, cy
+      cx, cy = GetFullForward(cx, cy, cdir)
+
+      local nc = walkDivergedPath(lx, ly, cx, cy)
+      cx = nc.x
+      cy = nc.y
+      cdir = nc.dir
+    until cells[cy][cx].ctype == 0
+
+    local bx, by = GetFullForward(x, y, dir, -1)
     if PushCell(bx, by, dir, true, 0) then
-      cells[nfy][nfx].rot = (cells[nfy][nfx].rot - 1) % 4
+      restoreRotations(originalRots, fx, fy, f.dir, 4, 0)
     else
-      cells[fy][fx].rot = (cells[fy][fx].rot - 1) % 4
+      restoreRotations(originalRots, x, y, f.dir, 4, 0)
     end
   else
     DoMover(x, y, dir)
