@@ -478,7 +478,7 @@ local function init()
   ids.fan = addCell("EMC fan", texp .. "fan.png")
   ids.conveyor = addCell("EMC conveyor", texp .. "conveyor.png")
   ids.monitor = addCell("EMC monitor", texp .. "monitor.png")
-  ids.musical = addCell("EMC musical", texp .. "musical.png", Options.trash)
+  ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true})
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
   addFlipperTranslation(1, 13)
@@ -507,7 +507,7 @@ local function init()
   ids.rep4 = addCell("EMC rep4", texp .. "4wayrep.png")
   ids.magnet = addCell("EMC magnet", texp .. "magnet.png")
 
-  ids.silentTrash = addCell("EMC silent-trash", texp .. "silentTrash.png", Options.combine(Options.trash, Options.neverupdate))
+  ids.silentTrash = addCell("EMC silent-trash", texp .. "silentTrash.png", Options.combine(Options.trash, Options.neverupdate, {silent = true}))
 
   if Toolbar then
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
@@ -875,18 +875,13 @@ end
 local function onTrashEats(id, x, y, food, fx, fy)
   DoDeathGen(x, y)
 
-  if id == ids.silentTrash then
-    destroysound:stop()
-  elseif id == ids.forward_right_forker then
-    destroysound:stop()
+  if id == ids.forward_right_forker then
     PushCell(x, y, cells[y][x].rot, true, 1, food.ctype, food.rot)
     PushCell(x, y, (cells[y][x].rot-1)%4, true, 1, food.ctype, (food.rot-1)%4)
   elseif id == ids.forward_left_forker then
-    destroysound:stop()
     PushCell(x, y, cells[y][x].rot, true, 1, food.ctype, food.rot)
     PushCell(x, y, (cells[y][x].rot+1)%4, true, 1, food.ctype, (food.rot+1)%4)
   elseif id == ids.musical then
-    destroysound:stop()
     local cdir
     if fx > x then cdir = 0 elseif fx < x then cdir = 2 end
     if fy > y then cdir = 1 elseif fy < y then cdir = 3 end

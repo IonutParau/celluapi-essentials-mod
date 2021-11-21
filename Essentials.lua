@@ -37,6 +37,10 @@ local function init()
     error("Stop being dumbass")
   end
 
+  if econfig['disable_music'] == true then
+    music:stop()
+  end
+
   showinstructions = false
   if Ereturns.MoreCells then
     table.insert(modcache, Ereturns.MoreCells)

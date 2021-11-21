@@ -8,5 +8,6 @@
   ],
   "customComponents": [],
   "resourcer_path": "Essentials/Resources",
-  "resourcer_overlay_transparency": true
+  "resourcer_overlay_transparency": true,
+  "disable_music": true
 }
