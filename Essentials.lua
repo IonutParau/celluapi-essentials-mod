@@ -10,13 +10,35 @@ local econfig = json.decode(love.filesystem.read("Essentials/config.json") or "{
 
 local Ereturns = {}
 
+local essentialsMenu = false
+
 local ver = "dededadsadawedas"
 local v2 = "dededadsadawedas"
 
 local loadedResourcer = false
 
+function MakeTexture(texture, display)
+  local img = love.graphics.newImage(texture)
+  return {
+    tex = img,
+    size = {
+      w = img:getWidth(),
+      h = img:getHeight(),
+      w2 = img:getWidth()/2,
+      h2 = img:getHeight()/2,
+    },
+    display = display or "No display",
+  }
+end
+
+local componentPics = {}
+
 for _, component in ipairs(econfig['components']) do
   Ereturns[component] = require("Essentials/" .. component)
+  local icon = MakeTexture("Essentials/Component Icons/" .. component .. ".png", component)
+  if icon then
+    table.insert(componentPics, icon)
+  end
 end
 
 local customComponents = {}
@@ -71,6 +93,26 @@ end
 
 local function customdraw()
   frames = frames + 1
+  -- if essentialsMenu then
+  --   paused = true
+  --   inmenu = false
+  --   placcells = false
+
+  --   love.graphics.setColor(1, 1, 1, 0.3)
+  --   love.graphics.rectangle("fill", 150 * winxm, 120 * winym, 500 * winxm, 390 * winym)
+  --   love.graphics.setColor(1, 1, 1, 1)
+  --   love.graphics.print("Essentials", 325 * winxm, 150 * winym, 0, winxm * 2, winym * 2)
+
+  --   local spacing = 180 / #(componentPics)
+  --   local size = 30
+
+  --   for i=1,#componentPics do
+  --     local pic = componentPics[i]
+  --     love.graphics.draw(pic.tex, (180 + i * spacing) * winxm, 240 * winym, 0, size/pic.size.w * winxm, size/pic.size.h * winym)
+  --   end
+
+  --   love.graphics.setColor(1, 1, 1, 1)
+  -- end
   if Toolbar then DoToolbarRender() end
   if Resourcer then
     if not loadedResourcer then
@@ -80,13 +122,10 @@ local function customdraw()
       Resourcer.LoadResources(econfig['resourcer_path'])
       loadedResourcer = true
     end
-    Resourcer.RenderListOverlays()
     Resourcer.RenderMouse()
     Resourcer.UpdateAnimations('ms', love.timer.getDelta() * 1000)
     Resourcer.UpdateAnimations('frame', 1)
-    if copied and pasting then
-      Resourcer.RenderMiniGridOverlay(copied)
-    end
+    Resourcer.RenderListOverlays()
   end
   runCustomComponentCallback('draw', love.timer.getDelta())
   if inmenu then
@@ -126,6 +165,21 @@ local function onPlace(id, x, y, rot, original)
   end
 end
 
+local function onKeyPressed(key, code, continuous)
+  -- if not continuous then
+  --   if key == 'e' and love.keyboard.isDown('lalt') then
+  --     currentrot = (currentrot - 1) % 4
+  --     essentialsMenu = not essentialsMenu
+  --   end
+  -- end
+end
+
+local function onGridRender()
+  if copied and pasting and Resourcer then
+    Resourcer.RenderMiniGridOverlay(copied)
+  end
+end
+
 return {
   init = init,
   customupdate = customupdate,
@@ -136,6 +190,8 @@ return {
   onMousePressed = onMousePressed,
   onMouseReleased = onMouseReleased,
   version = ver,
+  onKeyPressed = onKeyPressed,
+  onGridRender = onGridRender,
   dependencies = {
     "Essentials"
   }

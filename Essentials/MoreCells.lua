@@ -837,8 +837,8 @@ local function onPlace(id, x, y, rot, original, originalInitial)
   end
 end
 
-local function customdraw()
-  if not inmenu then
+local function onGridRender()
+  if not (inmenu or paused) then
     for x=1,width-1 do
       for y=1,height-1 do
         local id = cells[y][x].ctype
@@ -920,8 +920,8 @@ return {
   tick = tick,
   onCellDraw = onCellDraw,
   onPlace = onPlace,
-  customdraw = customdraw,
   onTrashEats = onTrashEats,
   onEnemyDies = onEnemyDies,
   onMove = onMove,
+  onGridRender = onGridRender,
 }
