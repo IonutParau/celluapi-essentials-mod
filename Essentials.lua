@@ -30,6 +30,7 @@ local function runCustomComponentCallback(callbackName, ...)
 end
 
 local atime = 0
+local frames = 0
 
 local function init()
   if ver ~= v2 then
@@ -65,6 +66,7 @@ local function customupdate(dt)
 end
 
 local function customdraw()
+  frames = frames + 1
   if Toolbar then DoToolbarRender() end
   if Resourcer then
     if not loadedResourcer then
@@ -86,6 +88,15 @@ local function customdraw()
     Ereturns.MoreCells.customdraw()
   end
   runCustomComponentCallback('draw', love.timer.getDelta())
+  if inmenu then
+    local r, g, b, a = love.graphics.getColor()
+    love.graphics.setColor(1, 0.8, 0, 1)
+    local s = math.sin(frames / 25) * 0.25
+    local w = love.graphics.getFont():getWidth("Essentials")
+    local h = love.graphics.getFont():getHeight()
+    love.graphics.print("Essentials", 155*winxm, 105*winym, -math.pi*0.125, winxm + s, winym + s, w /2 * (winxm + s), h / 2 * (winym + s))
+    love.graphics.setColor(r, g, b, a)
+  end
 end
 
 local function onCellDraw(id, x, y, rot)
