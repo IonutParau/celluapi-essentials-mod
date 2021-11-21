@@ -318,14 +318,10 @@ end
 local function Do4Rep(x, y)
   for dir=0,3 do
     local fx, fy = GetFullForward(x, y, dir)
-    local ffx, ffy = GetFullForward(x, y, dir, 2)
 
     local f = walkDivergedPath(x, y, fx, fy)
     fx = f.x
     fy = f.y
-    local ff = walkDivergedPath(x, y, ffx, ffy)
-    ffx = ff.x
-    ffy = ff.y
 
     local front = cells[fy][fx]
 
@@ -340,6 +336,8 @@ local function Do4Rep(x, y)
       PushCell(x, y, dir, true, 1, front.ctype, fdir, nil, {x, y, fdir})
       if front.ctype == 19 then
         cells[fy][fx].ctype = 0
+      elseif front.ctype == ids.rep4 then
+        cells[fy][fx].updated = true
       end
     end
   end
@@ -448,7 +446,7 @@ local function init()
   ids.brighterLightBulb = addCell("EMC mech light-bulb-brighter", texp .. "lightbulbs/brighter.png", Options.static)
   ids.brightestLightBulb = addCell("EMC mech light-bulb-brightest", texp .. "lightbulbs/brightest.png", Options.static)
   ids.slideopener = addCell("EMC mech slideopener", texp .. "slideopener.png", Options.mover)
-  ids.crosswire = addCell("EMC mech crosswire", "textures/push.png", Options.neverupdate)
+  ids.crosswire = addCell("EMC mech crosswire", texp .. "wire/cross.png", Options.neverupdate)
 
   -- Add gates
   ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
