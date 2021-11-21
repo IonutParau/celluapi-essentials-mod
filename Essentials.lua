@@ -34,12 +34,12 @@ local frames = 0
 
 local function init()
   if ver ~= v2 then
-
+    error("Stop being dumbass")
   end
 
   showinstructions = false
   if Ereturns.MoreCells then
-    Ereturns.MoreCells.init()
+    table.insert(modcache, Ereturns.MoreCells)
   end
   for _, custom in ipairs(econfig['customComponents']) do
     local cc = require(custom)
@@ -84,9 +84,6 @@ local function customdraw()
       Resourcer.RenderMiniGridOverlay(copied)
     end
   end
-  if Ereturns.MoreCells then
-    Ereturns.MoreCells.customdraw()
-  end
   runCustomComponentCallback('draw', love.timer.getDelta())
   if inmenu then
     local r, g, b, a = love.graphics.getColor()
@@ -102,15 +99,6 @@ end
 local function onCellDraw(id, x, y, rot)
   if id ~= 0 and Resourcer then
     Resourcer.RenderOverlay(id, x, y)
-  end
-  if Ereturns.MoreCells then
-    Ereturns.MoreCells.onCellDraw(id, x, y, rot)
-  end
-end
-
-local function update(id, x, y, dir)
-  if Ereturns.MoreCells then
-    Ereturns.MoreCells.update(id, x, y, dir)
   end
 end
 
@@ -132,21 +120,6 @@ local function onPlace(id, x, y, rot, original)
   if Toolbar then
     ToolbarPlaceTools(id, x, y, rot, original)
   end
-  if Ereturns.MoreCells then
-    Ereturns.MoreCells.onPlace(id, x, y, rot, original, originalInitial)
-  end
-end
-
-local function tick()
-  if Ereturns.MoreCells then
-    Ereturns.MoreCells.tick()
-  end
-end
-
-local function onTrashEats(id, x, y, food, fx, fy)
-  if Ereturns.MoreCells then
-    Ereturns.MoreCells.onTrashEats(id, x, y, food, fx, fy)
-  end
 end
 
 return {
@@ -158,8 +131,6 @@ return {
   onPlace = onPlace,
   onMousePressed = onMousePressed,
   onMouseReleased = onMouseReleased,
-  onTrashEats = onTrashEats,
-  tick = tick,
   version = ver,
   dependencies = {
     "Essentials"

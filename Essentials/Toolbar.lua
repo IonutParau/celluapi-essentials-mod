@@ -89,6 +89,12 @@ function ToolbarSystem.Item()
   }
 end
 
+local function FixItems(self)
+  if #(self.items) % 16 == 0 and #(self.items) >= 16 then
+    self:AddItem("Back", "Takes you back", backp)
+  end
+end
+
 --- @param self ToolbarSystem.Category
 --- @param name string
 --- @param description string
@@ -109,6 +115,7 @@ local function AddCategory(self, name, description, image)
   c:AddItem("Back", "Takes you back", backp)
   c.hypercat = self
   table.insert(self.items, c)
+  self:FixItems()
   return c
 end
 
@@ -123,6 +130,9 @@ local function AddItem(self, name, description, cellID)
   i.description = description
   i.image = getRealID(cellID) or cellID
   table.insert(self.items, i)
+  if cellID ~= backp then
+    self:FixItems()
+  end
   return i
 end
 
@@ -159,6 +169,7 @@ end
 --- @field items table<number, ToolbarSystem.Item>
 --- @field AddCategory function()
 --- @field AddItem function()
+--- @field FixItems function()
 --- @field GetCategory function()
 --- @field GetItem function()
 --- @field GetChild function()
@@ -171,6 +182,7 @@ function ToolbarSystem.Category()
     items = {},
     AddCategory = AddCategory,
     AddItem = AddItem,
+    FixItems = FixItems,
     GetCategory = GetCategory,
     GetItem = GetItem,
     GetChild = GetChild,
@@ -479,6 +491,7 @@ function DoToolbarUpdate()
   if currentstate == backp and current ~= Toolbar then
     current = current.hypercat
     currentstate = pastcurrentstate
+    page = 1
   elseif type(currentstate) == "string" and string.sub(currentstate, 1, 10) == "structure-" then
     ToolbarSystem.ActivateStructure(structures[currentstate])
     currentstate = pastcurrentstate

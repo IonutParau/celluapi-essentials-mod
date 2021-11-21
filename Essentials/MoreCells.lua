@@ -45,6 +45,9 @@ local function makeTex(pic)
 end
 
 local wireArm = makeTex(texp .. "wire/arm.png")
+local crossArm = makeTex(texp .. "wire/cross_arm.png")
+local crossPower1 = makeTex(texp .. "wire/cross/cross3.png")
+local crossPower2 = makeTex(texp .. "wire/cross/cross2.png")
 local wireActive = makeTex(texp .. "wire/on.png")
 local pistonOn = makeTex(texp .. "piston/on.png")
 local stickyPistonOn = makeTex(texp .. "piston/sticky-on.png")
@@ -109,7 +112,7 @@ local function isConnectable(cell, dir)
       return true
     end
 
-    if (id == ids.motionSensor) or (id == ids.piston) or (id == ids.stickyPiston) then
+    if (id == ids.motionSensor) or (id == ids.piston) or (id == ids.stickyPiston) or (id == ids.movementSensor) then
       return rdir ~= 2
     end
 
@@ -158,6 +161,9 @@ function SignalMechanical(x, y, blockdir, forced)
     if i ~= blockdir then
       local off = GetForward(i)
       local ox, oy = x + off.x, y + off.y
+      local o = walkDivergedPath(x, y, ox, oy)
+      ox = o.x
+      oy = o.y
       local canSpread = true
       if not forced then
         canSpread = (cells[y][x].ctype == ids.wire)
@@ -431,12 +437,19 @@ local function DoStickyPiston(x, y, dir)
   end
 end
 
+local function backOnlySided(x, y, dir)
+  return (dir == (cells[y][x].rot))
+end
+
 local function init()
+  local placeholder = "textures/push.png"
+
   -- Gens
   ids.motionSensor = addCell("EMC mech motion-sensor", texp .. "motionSensor.png", {updateindex = 1})
   ids.delayer = addCell("EMC mech motion-sensor", texp .. "delayer.png", {updateindex = 2})
   ids.wire = addCell("EMC mech wire", texp .. "wire/off.png", {updateindex = 3})
   ids.mech_gen = addCell("EMC mech mech_gen", texp .. "mech_gen.png", {updateindex = 4})
+  --ids.movementSensor = addCell("EMC mech move-sensor", placeholder, {updateindex = 5})
   -- Users
   ids.activator = addCell("EMC mech activator", texp .. "activator.png", Options.neverupdate)
   ids.piston = addCell("EMC mech piston", texp .. "piston/off.png", Options.neverupdate)
@@ -446,7 +459,7 @@ local function init()
   ids.brighterLightBulb = addCell("EMC mech light-bulb-brighter", texp .. "lightbulbs/brighter.png", Options.static)
   ids.brightestLightBulb = addCell("EMC mech light-bulb-brightest", texp .. "lightbulbs/brightest.png", Options.static)
   ids.slideopener = addCell("EMC mech slideopener", texp .. "slideopener.png", Options.mover)
-  ids.crosswire = addCell("EMC mech crosswire", texp .. "wire/cross.png", Options.neverupdate)
+  ids.crosswire = addCell("EMC mech crosswire", texp .. "wire/cross/cross1.png", Options.neverupdate)
 
   -- Add gates
   ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
@@ -463,6 +476,12 @@ local function init()
   giveSubtick(ids.stickyPiston, DoModded)
 
   ids.fan = addCell("EMC fan", texp .. "fan.png")
+  ids.conveyor = addCell("EMC conveyor", texp .. "conveyor.png")
+  ids.monitor = addCell("EMC monitor", texp .. "monitor.png")
+  ids.musical = addCell("EMC musical", texp .. "musical.png", Options.trash)
+
+  addFlipperTranslation(ids.monitor, ids.musical, false)
+  addFlipperTranslation(1, 13)
 
   -- Add useful stuff
   local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash", dontupdate = true})
@@ -478,8 +497,15 @@ local function init()
     return ((dir+2)%4 == cells[y][x].rot)
   end)
 
+  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true})
+  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true})
+
+  SetSidedTrash(ids.forward_right_forker, backOnlySided)
+  SetSidedTrash(ids.forward_right_forker, backOnlySided)
+
   ids.gen4 = addCell("EMC gen4", texp .. "4waygen.png")
   ids.rep4 = addCell("EMC rep4", texp .. "4wayrep.png")
+  ids.magnet = addCell("EMC magnet", texp .. "magnet.png")
 
   ids.silentTrash = addCell("EMC silent-trash", texp .. "silentTrash.png", Options.combine(Options.trash, Options.neverupdate))
 
@@ -487,6 +513,7 @@ local function init()
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
 
     mechCat:AddItem("Motion Sensor", "Senses motion. If it detects motion, it outputs a mechanical signal", ids.motionSensor)
+    --mechCat:AddItem("Movement Sensor", "If moved, it outputs a mechanical signal", ids.movementSensor)
     mechCat:AddItem("Wire", "Extends mechanical signals further", ids.wire)
     mechCat:AddItem("CrossWire", "Acts as a wire while keeping 2 signals seperated", ids.crosswire)
     mechCat:AddItem("Activator", "Acts like a freezer while not recieving a mechanical signal", ids.activator)
@@ -523,11 +550,20 @@ local function init()
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "Can only open slide cells from the immovable sides. Doesn't move slide cells on other sides", ids.slideopener)
     movCat:AddItem("Fan", "Pushes cells in front of it constantly", ids.fan)
+    movCat:AddItem("Conveyor Cell", "Pushes the cells on its sides forward", ids.conveyor)
+    movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
     genCat:AddItem("4-way Replicator", "Replicates stuff on all 4 sides.", ids.rep4)
 
+    local forkerCat = Toolbar:GetCategory("Forkers")
+    forkerCat:AddItem("Forward-Right Forker", "Name says it all", ids.forward_right_forker)
+    forkerCat:AddItem("Forward-Left Forker", "Name says it all", ids.forward_left_forker)
+
+    local uniqueCat = Toolbar:GetCategory("Unique cells")
+    uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595", ids.monitor)
+    uniqueCat:AddItem("The Musical Cell", "\"At last, it has come.\" \nIs a trash cell but plays a special sound based off of where the cell came from.", ids.musical)
   end
 end
 
@@ -539,7 +575,7 @@ end
 
 local function DoLightbulb(x, y)
   if isMechOn(x, y) then
-    local spos = calculateScreenPosition(x, y)
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
     local radius = 5
 
     local id = cells[y][x].ctype
@@ -605,18 +641,20 @@ function DoSlideOpener(x, y, dir)
   cy = c.y
   local cdir = c.dir
   repeat
-    table.insert(originalRots, cells[cy][cx].rot)
-    if cells[cy][cx].ctype == 4 then
-      cells[cy][cx].rot = (cells[cy][cx].rot + 1) % 4
-    end
-    local lx, ly = cx, cy
-    cx, cy = GetFullForward(cx, cy, cdir)
+    if inGrid(cx, cy) then
+      table.insert(originalRots, cells[cy][cx].rot)
+      if cells[cy][cx].ctype == 4 then
+        cells[cy][cx].rot = (cells[cy][cx].rot + 1) % 4
+      end
+      local lx, ly = cx, cy
+      cx, cy = GetFullForward(cx, cy, cdir)
 
-    local nc = walkDivergedPath(lx, ly, cx, cy)
-    cx = nc.x
-    cy = nc.y
-    cdir = nc.dir
-  until cells[cy][cx].ctype == 0
+      local nc = walkDivergedPath(lx, ly, cx, cy)
+      cx = nc.x
+      cy = nc.y
+      cdir = nc.dir
+    end
+  until cells[cy][cx].ctype == 0 or not inGrid(cx, cy)
 
   local bx, by = GetFullForward(x, y, dir, -1)
   if PushCell(bx, by, dir, true, 0) then
@@ -624,6 +662,28 @@ function DoSlideOpener(x, y, dir)
   else
     restoreRotations(originalRots, x, y, f.dir, 4, 0)
   end
+end
+
+local function DoConveyor(x, y, dir)
+  local lx, ly = GetFullForward(x, y, dir-1)
+  local rx, ry = GetFullForward(x, y, dir+1)
+
+  local off = GetForward(dir, -1)
+  local ox, oy = off.x, off.y
+  local strength = 1
+
+  if cells[ly][lx].ctype ~= 0 then
+    PushCell(lx+ox, ly+oy, dir, true, strength)
+  elseif cells[ry][rx].ctype ~= 0 then
+    PushCell(rx+ox, ry+oy, dir, true, strength)
+  end
+end
+
+local function DoMagnet(x, y, dir)
+  local pullX, pullY = GetFullForward(x, y, dir, -2)
+
+  PushCell(x, y, dir, true, 1)
+  PullCell(pullX, pullY, dir, false, 1)
 end
 
 local function update(id, x, y, dir)
@@ -663,6 +723,10 @@ local function update(id, x, y, dir)
     DoSlideOpener(x, y, dir)
   elseif id == ids.fan then
     PushCell(x, y, dir)
+  elseif id == ids.conveyor then
+    DoConveyor(x, y, dir)
+  elseif id == ids.magnet then
+    DoMagnet(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -694,6 +758,39 @@ local function onCellDraw(id, x, y, rot)
     if isMechOn(x, y) then
       love.graphics.draw(wireActive.tex, spos.x, spos.y, rot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
     end
+  elseif id == ids.crosswire then
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
+    local renderArm = function(r)
+      love.graphics.draw(crossArm.tex, spos.x, spos.y, r*half_pi, zoom/crossArm.size.w, zoom/crossArm.size.h, crossArm.size.w2, crossArm.size.h2)
+    end
+    local renderPower1 = function(r)
+      love.graphics.draw(crossPower1.tex, spos.x, spos.y, r*half_pi, zoom/crossPower1.size.w, zoom/crossPower1.size.h, crossPower1.size.w2, crossPower1.size.h2)
+    end
+
+    local renderPower2 = function(r)
+      love.graphics.draw(crossPower2.tex, spos.x, spos.y, r*half_pi, zoom/crossPower2.size.w, zoom/crossPower2.size.h, crossPower2.size.w2, crossPower2.size.h2)
+    end
+
+    for dir=0, 3 do
+      local ox, oy = GetFullForward(x, y, dir)
+      if isConnectable(cells[oy][ox], dir) then
+        renderArm(dir)
+      end
+
+      if isMechOn(ox, oy) then
+        local cdir = (cells[y][x].rot-dir)
+
+        if cdir % 2 == 0 then
+          renderPower2(cdir)
+        else
+          renderPower1(cdir)
+        end
+      end
+    end
+
+    if isMechOn(x, y) then
+      love.graphics.draw(wireActive.tex, spos.x, spos.y, rot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
+    end
   elseif id == ids.piston and isMechOn(x, y) then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
@@ -702,15 +799,43 @@ local function onCellDraw(id, x, y, rot)
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
     love.graphics.draw(stickyPistonOn.tex, spos.x, spos.y, rot*half_pi, zoom/stickyPistonOn.size.w, zoom/stickyPistonOn.size.h, stickyPistonOn.size.w2, stickyPistonOn.size.h2)
+  elseif id == ids.monitor then
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
+
+    if cells[y][x].monitor_torender ~= nil then
+      local mid = cells[y][x].monitor_torender
+      love.graphics.draw(tex[mid], spos.x, spos.y, cells[y][x].rot * math.pi/2, zoom/texsize[mid].w/3, zoom/texsize[mid].h/3, texsize[mid].w2, texsize[mid].h)
+    end
   end
 end
 
 local function tick()
-  -- No tick plz
+  for y=1,height-1 do
+    for x=1,width-1 do
+      if cells[y][x].sticky_moved then
+        cells[y][x].sticky_moved = false
+      end
+    end
+  end
+
+  -- repeat
+  --   local q = stickyQueue[1]
+  --   if type(q) == "table" then
+  --     PushCell(q[1], q[2], q[3], true, 1)
+  --     table.remove(stickyQueue, 1)
+  --   end
+  -- until #stickyQueue == 0
 end
 
-local function onPlace(id, x, y, rot)
+local function onPlace(id, x, y, rot, original, originalInitial)
   cells[y][x].mech_signal = 0
+
+  if original.ctype == ids.monitor and id ~= ids.monitor and id ~= 0 then
+    cells[y][x] = original
+    initial[y][x] = originalInitial
+
+    cells[y][x].monitor_torender = id
+  end
 end
 
 local function customdraw()
@@ -726,11 +851,74 @@ local function customdraw()
   end
 end
 
-local function onTrashEats(id, x, y, food, fx, fy)
-  if id == ids.silentTrash then
-    destroysound:stop()
+-- local function playStreamSound(sound)
+--   if not audiocache[sound] then
+--     audiocache[sound] = love.audio.newSource(sound, "stream")
+--   end
+--   love.audio.play(audiocache[sound])
+-- end
+
+local function DoDeathGen(x, y)
+  local range = 50
+
+  for ox = -range, range do
+    for oy = -range, range do
+      local dist2 = (ox * ox + oy * oy)
+      if dist2 < (range * range) then -- Fast distance calculation boiii
+        if inGrid(x+ox, y+oy) and cells[y+oy][x+ox].ctype == ids.deathSensor then
+          SignalMechanical(x+ox, y+oy, nil, true)
+        end
+      end
+    end
   end
 end
+
+local function onTrashEats(id, x, y, food, fx, fy)
+  DoDeathGen(x, y)
+
+  if id == ids.silentTrash then
+    destroysound:stop()
+  elseif id == ids.forward_right_forker then
+    destroysound:stop()
+    PushCell(x, y, cells[y][x].rot, true, 1, food.ctype, food.rot)
+    PushCell(x, y, (cells[y][x].rot-1)%4, true, 1, food.ctype, (food.rot-1)%4)
+  elseif id == ids.forward_left_forker then
+    destroysound:stop()
+    PushCell(x, y, cells[y][x].rot, true, 1, food.ctype, food.rot)
+    PushCell(x, y, (cells[y][x].rot+1)%4, true, 1, food.ctype, (food.rot+1)%4)
+  elseif id == ids.musical then
+    destroysound:stop()
+    local cdir
+    if fx > x then cdir = 0 elseif fx < x then cdir = 2 end
+    if fy > y then cdir = 1 elseif fy < y then cdir = 3 end
+
+    local dir = (cells[y][x].rot - cdir) % 4
+
+    local sounds = {
+      texp .. "sounds/piano1.wav",
+      texp .. "sounds/piano2.wav",
+      texp .. "sounds/piano3.wav",
+      texp .. "sounds/piano4.wav",
+    }
+    if audiocache[sounds[dir+1]] then
+      if audiocache[sounds[dir+1]]:isPlaying() then
+        audiocache[sounds[dir+1]]:stop()
+      end
+    end
+    playSound(sounds[dir+1])
+  end
+end
+
+local function onEnemyDies(id, x, y, killer, kx, ky)
+  DoDeathGen(x, y)
+end
+
+-- local function onMove(id, x, y, rot)
+--   if id == ids.movementSensor and not cells[y][x].updated then
+--     cells[y][x].updated = true
+--     SignalMechanical(x, y, rot, true)
+--   end
+-- end
 
 return {
   init = init,
@@ -740,4 +928,6 @@ return {
   onPlace = onPlace,
   customdraw = customdraw,
   onTrashEats = onTrashEats,
+  onEnemyDies = onEnemyDies,
+  onMove = onMove,
 }
