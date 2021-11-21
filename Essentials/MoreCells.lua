@@ -599,36 +599,32 @@ function DoSlideOpener(x, y, dir)
   fy = f.y
   local appliedRot = f.dir - dir
 
-  if cells[fy][fx].ctype == 4 then
-    local originalRots = {}
-    -- Get rots
-    local cx, cy = GetFullForward(x, y, dir)
-    local c = walkDivergedPath(x, y, cx, cy)
-    cx = c.x
-    cy = c.y
-    local cdir = c.dir
-    repeat
-      table.insert(originalRots, cells[cy][cx].rot)
-      if cells[cy][cx].ctype == 4 then
-        cells[cy][cx].rot = (cells[cy][cx].rot + 1) % 4
-      end
-      local lx, ly = cx, cy
-      cx, cy = GetFullForward(cx, cy, cdir)
-
-      local nc = walkDivergedPath(lx, ly, cx, cy)
-      cx = nc.x
-      cy = nc.y
-      cdir = nc.dir
-    until cells[cy][cx].ctype == 0
-
-    local bx, by = GetFullForward(x, y, dir, -1)
-    if PushCell(bx, by, dir, true, 0) then
-      restoreRotations(originalRots, fx, fy, f.dir, 4, 0)
-    else
-      restoreRotations(originalRots, x, y, f.dir, 4, 0)
+  local originalRots = {}
+  -- Get rots
+  local cx, cy = GetFullForward(x, y, dir)
+  local c = walkDivergedPath(x, y, cx, cy)
+  cx = c.x
+  cy = c.y
+  local cdir = c.dir
+  repeat
+    table.insert(originalRots, cells[cy][cx].rot)
+    if cells[cy][cx].ctype == 4 then
+      cells[cy][cx].rot = (cells[cy][cx].rot + 1) % 4
     end
+    local lx, ly = cx, cy
+    cx, cy = GetFullForward(cx, cy, cdir)
+
+    local nc = walkDivergedPath(lx, ly, cx, cy)
+    cx = nc.x
+    cy = nc.y
+    cdir = nc.dir
+  until cells[cy][cx].ctype == 0
+
+  local bx, by = GetFullForward(x, y, dir, -1)
+  if PushCell(bx, by, dir, true, 0) then
+    restoreRotations(originalRots, fx, fy, f.dir, 4, 0)
   else
-    DoMover(x, y, dir)
+    restoreRotations(originalRots, x, y, f.dir, 4, 0)
   end
 end
 
