@@ -772,18 +772,17 @@ local function onCellDraw(id, x, y, rot)
     end
 
     for dir=0, 3 do
+      dir = (cells[y][x].rot + dir) % 4
       local ox, oy = GetFullForward(x, y, dir)
       if isConnectable(cells[oy][ox], dir) then
         renderArm(dir)
       end
 
       if isMechOn(ox, oy) then
-        local cdir = (cells[y][x].rot-dir)
-
-        if cdir % 2 == 0 then
-          renderPower2(cdir)
+        if rot % 2 == dir % 2 then
+          renderPower2(rot)
         else
-          renderPower1(cdir)
+          renderPower1(rot)
         end
       end
     end
