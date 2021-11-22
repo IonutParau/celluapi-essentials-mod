@@ -548,7 +548,7 @@ local function init()
 
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
-    movCat:AddItem("Slide Opener", "Can only open slide cells from the immovable sides. Doesn't move slide cells on other sides", ids.slideopener)
+    movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
     movCat:AddItem("Fan", "Pushes cells in front of it constantly", ids.fan)
     movCat:AddItem("Conveyor Cell", "Pushes the cells on its sides forward", ids.conveyor)
     movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
