@@ -606,7 +606,7 @@ local function DoLightbulb(x, y)
   end
 end
 
-local function restoreRotations(rotations, x, y, dir, id, ar)
+local function restoreRotations(rotations, x, y, dir, id, ar, applyrot)
   local fx, fy = x, y
 
   for i=0,#rotations do
@@ -622,6 +622,7 @@ local function restoreRotations(rotations, x, y, dir, id, ar)
       local appliedRot = dir - odir
 
       if cells[fy][fx].ctype == id then
+        if not applyrot then appliedRot = 0 end
         cells[fy][fx].rot = rotations[i] + appliedRot + ar
       end
     end
@@ -660,9 +661,9 @@ function DoSlideOpener(x, y, dir)
 
   local bx, by = GetFullForward(x, y, dir, -1)
   if PushCell(bx, by, dir, true, 0) then
-    restoreRotations(originalRots, fx, fy, f.dir, 4, 0)
+    restoreRotations(originalRots, fx, fy, f.dir, 4, 0, true)
   else
-    restoreRotations(originalRots, x, y, f.dir, 4, 0)
+    restoreRotations(originalRots, x, y, f.dir, 4, 0, false)
   end
 end
 
