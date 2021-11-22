@@ -609,19 +609,21 @@ end
 local function restoreRotations(rotations, x, y, dir, id, ar)
   local fx, fy = x, y
 
-  for i=1,#rotations do
-    local lx, ly = fx, fy
-    fx, fy = GetFullForward(fx, fy, dir)
+  for i=0,#rotations do
+    if type(rotations[i]) == "number" then
+      local lx, ly = fx, fy
+      fx, fy = GetFullForward(fx, fy, dir)
 
-    local f = walkDivergedPath(lx, ly, fx, fy)
-    fx = f.x
-    fy = f.y
-    local odir = dir
-    dir = f.dir
-    local appliedRot = dir - odir
+      local f = walkDivergedPath(lx, ly, fx, fy)
+      fx = f.x
+      fy = f.y
+      local odir = dir
+      dir = f.dir
+      local appliedRot = dir - odir
 
-    if cells[fy][fx].ctype == id then
-      cells[fy][fx].rot = rotations[i] + appliedRot + ar
+      if cells[fy][fx].ctype == id then
+        cells[fy][fx].rot = rotations[i] + appliedRot + ar
+      end
     end
   end
 end
@@ -641,7 +643,7 @@ function DoSlideOpener(x, y, dir)
   cy = c.y
   local cdir = c.dir
   repeat
-    if inGrid(cx, cy) then
+    if inGrid(cx, cy) and cells[cy][cx].ctype ~= 0 then
       table.insert(originalRots, cells[cy][cx].rot)
       if cells[cy][cx].ctype == 4 then
         cells[cy][cx].rot = (cells[cy][cx].rot + 1) % 4
@@ -838,7 +840,7 @@ local function onPlace(id, x, y, rot, original, originalInitial)
 end
 
 local function onGridRender()
-  if not (inmenu or paused) then
+  if not (paused) then
     for x=1,width-1 do
       for y=1,height-1 do
         local id = cells[y][x].ctype
