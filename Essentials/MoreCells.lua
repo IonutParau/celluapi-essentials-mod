@@ -730,7 +730,7 @@ end
 local function DoPlayer(x, y, dir, recursive)
   cells[y][x].updated = true
   if love.keyboard.isDown('i') and not recursive then
-    if not cells[y][x].player_copy then
+    if cells[y][x].ctype == ids.player then
       DoMover(x, y, dir)
     else
       DoModded(x, y, dir)
@@ -752,15 +752,18 @@ local function DoPlayer(x, y, dir, recursive)
   end
 end
 
-local function update(id, x, y, dir)
-  if cells[y][x].is_hidden_player then
-    DoPlayer(x, y, dir, true)
-
-    if not love.keyboard.isDown('i') then
-      return
+local function fixPlayerHidedness()
+  for y=1,height-1 do
+    for x=1,width-1 do
+      if cells[y][x].is_hidden_player and not cells[y][x].updated then
+        cells[y][x].updated = true
+        DoPlayer(x, y, cells[y][x].rot)
+      end
     end
   end
+end
 
+local function update(id, x, y, dir)
   if id == ids.motionSensor then
     DoMotionSensor(x, y, dir)
   elseif id == ids.delayer then
@@ -1038,9 +1041,13 @@ end
 -- end
 
 local playTime = 0
+local loadedPlayerFix = false
 
 local function customupdate(dt)
-  
+  if not loadedPlayerFix then
+    loadedPlayerFix = true
+    table.insert(subticks, 1, fixPlayerHidedness)
+  end
 end
 
 local function onKeyPressed(key, code, continous)
