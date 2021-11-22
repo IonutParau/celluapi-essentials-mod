@@ -1,8 +1,10 @@
 local ids = {}
 
 local texp = "MoreCells/"
+local econfig = {}
 if IsEssentials then
   texp = "Essentials/" .. texp
+  econfig = GetEssentialsConfig()
 end
 
 local half_pi = math.pi / 2
@@ -205,7 +207,7 @@ local function DoActivator(x, y)
       local ox, oy = x + off.x, y + off.y
       local id = cells[oy][ox].ctype
 
-      if id ~= ids.wire and id ~= ids.motionSensor and id ~= ids.mech_gen then
+      if id ~= ids.wire and id ~= ids.motionSensor and id ~= ids.mech_gen and not isUnfreezable(id) then
         cells[oy][ox].updated = true
       end
     end
@@ -481,6 +483,8 @@ local function init()
   ids.conveyor = addCell("EMC conveyor", texp .. "conveyor.png")
   ids.monitor = addCell("EMC monitor", texp .. "monitor.png")
   ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true})
+  ids.player = addCell("EMC player", texp .. "player.png", Options.combine(Options.mover, Options.ungenable))
+  ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
   addFlipperTranslation(1, 13)
@@ -498,6 +502,8 @@ local function init()
     if dir == nil then return false end
     return ((dir+2)%4 == cells[y][x].rot)
   end)
+
+  ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash))
 
   ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true})
   ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true})
@@ -547,14 +553,17 @@ local function init()
     destCat:AddItem("Trash Slider", "Acts as a trash cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideTrash)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
+    destCat:AddItem("Ghost Trash", "Trash cell that can't be generated", ids.ghostTrash)
 
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
+    
     local fanCat = movCat:AddCategory("Fans", "They create a constant force pushing cells in front.", texp .. "fans/fan.png")
     fanCat:AddItem("Fan", "Only pushes cells directly in front of it", ids.fan)
     fanCat:AddItem("Super Fan", "Has a range of 2 cell units", ids.strongfan)
     fanCat:AddItem("Hyper Fan", "Has a range of 4 cell units", ids.hyperfan)
+
     movCat:AddItem("Conveyor Cell", "Pushes the cells on its sides forward", ids.conveyor)
     movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
 
@@ -567,8 +576,9 @@ local function init()
     forkerCat:AddItem("Forward-Left Forker", "Name says it all", ids.forward_left_forker)
 
     local uniqueCat = Toolbar:GetCategory("Unique cells")
-    uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595", ids.monitor)
+    uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595\nWhen placing a cell on a monitor, the monitor will display that cell", ids.monitor)
     uniqueCat:AddItem("The Musical Cell", "\"At last, it has come.\" \nIs a trash cell but plays a special sound based off of where the cell came from.", ids.musical)
+    uniqueCat:AddItem("Player Cell", "Cell that can be controlled by the I, J and L keys. You can even control multiple at once!", ids.player)
   end
 end
 
@@ -717,7 +727,40 @@ local function DoFan(x, y, dir)
   end
 end
 
+local function DoPlayer(x, y, dir, recursive)
+  cells[y][x].updated = true
+  if love.keyboard.isDown('i') and not recursive then
+    if not cells[y][x].player_copy then
+      DoMover(x, y, dir)
+    else
+      DoModded(x, y, dir)
+    end
+  end
+  if love.keyboard.isDown('k') then
+    -- Kopy ability
+    local fx, fy = GetFullForward(x, y, dir)
+    if cells[fy][fx].ctype > initialCellCount then
+      cells[y][x].ctype = cells[fy][fx].ctype
+      cells[y][x].is_hidden_player = true
+      SetChunk(x, y, cells[fy][fx].ctype)
+      --cells[y][x].ctype = cells[fy][fx].ctype
+    else
+      cells[y][x].ctype = ids.player
+      cells[y][x].is_hidden_player = false
+      SetChunk(x, y, ids.player)
+    end
+  end
+end
+
 local function update(id, x, y, dir)
+  if cells[y][x].is_hidden_player then
+    DoPlayer(x, y, dir, true)
+
+    if not love.keyboard.isDown('i') then
+      return
+    end
+  end
+
   if id == ids.motionSensor then
     DoMotionSensor(x, y, dir)
   elseif id == ids.delayer then
@@ -758,6 +801,8 @@ local function update(id, x, y, dir)
     DoConveyor(x, y, dir)
   elseif id == ids.magnet then
     DoMagnet(x, y, dir)
+  elseif id == ids.player then
+    DoPlayer(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -767,6 +812,8 @@ local function update(id, x, y, dir)
 end
 
 local function onCellDraw(id, x, y, rot)
+  local rrot = LerpRotation((cells[y][x].lastvars or {x, y, rot})[3], rot)
+
   if id == ids.wire then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
     local renderArm = function(r)
@@ -787,7 +834,7 @@ local function onCellDraw(id, x, y, rot)
     end
 
     if isMechOn(x, y) then
-      love.graphics.draw(wireActive.tex, spos.x, spos.y, rot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
+      love.graphics.draw(wireActive.tex, spos.x, spos.y, rrot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
     end
   elseif id == ids.crosswire then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
@@ -795,10 +842,12 @@ local function onCellDraw(id, x, y, rot)
       love.graphics.draw(crossArm.tex, spos.x, spos.y, r*half_pi, zoom/crossArm.size.w, zoom/crossArm.size.h, crossArm.size.w2, crossArm.size.h2)
     end
     local renderPower1 = function(r)
+      r = LerpRotation(cells[y][x].lastvars[3], r)
       love.graphics.draw(crossPower1.tex, spos.x, spos.y, r*half_pi, zoom/crossPower1.size.w, zoom/crossPower1.size.h, crossPower1.size.w2, crossPower1.size.h2)
     end
 
     local renderPower2 = function(r)
+      r = LerpRotation(cells[y][x].lastvars[3], r)
       love.graphics.draw(crossPower2.tex, spos.x, spos.y, r*half_pi, zoom/crossPower2.size.w, zoom/crossPower2.size.h, crossPower2.size.w2, crossPower2.size.h2)
     end
 
@@ -818,23 +867,24 @@ local function onCellDraw(id, x, y, rot)
       end
     end
 
-    if isMechOn(x, y) then
-      love.graphics.draw(wireActive.tex, spos.x, spos.y, rot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
-    end
+    -- if isMechOn(x, y) then
+    --   love.graphics.draw(wireActive.tex, spos.x, spos.y, rrot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
+    -- end
   elseif id == ids.piston and isMechOn(x, y) then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
-    love.graphics.draw(pistonOn.tex, spos.x, spos.y, rot*half_pi, zoom/pistonOn.size.w, zoom/pistonOn.size.h, pistonOn.size.w2, pistonOn.size.h2)
+    love.graphics.draw(pistonOn.tex, spos.x, spos.y, rrot*half_pi, zoom/pistonOn.size.w, zoom/pistonOn.size.h, pistonOn.size.w2, pistonOn.size.h2)
   elseif id == ids.stickyPiston and isMechOn(x, y) then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
-    love.graphics.draw(stickyPistonOn.tex, spos.x, spos.y, rot*half_pi, zoom/stickyPistonOn.size.w, zoom/stickyPistonOn.size.h, stickyPistonOn.size.w2, stickyPistonOn.size.h2)
+    love.graphics.draw(stickyPistonOn.tex, spos.x, spos.y, rrot*half_pi, zoom/stickyPistonOn.size.w, zoom/stickyPistonOn.size.h, stickyPistonOn.size.w2, stickyPistonOn.size.h2)
   elseif id == ids.monitor then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
+    local srot = LerpRotation(cells[y][x].lastvars[3], rot)
 
     if cells[y][x].monitor_torender ~= nil then
       local mid = cells[y][x].monitor_torender
-      love.graphics.draw(tex[mid], spos.x, spos.y, cells[y][x].rot * math.pi/2, zoom/texsize[mid].w/3, zoom/texsize[mid].h/3, texsize[mid].w2, texsize[mid].h)
+      love.graphics.draw(tex[mid], spos.x, spos.y, srot * math.pi/2, zoom/texsize[mid].w/3, zoom/texsize[mid].h/3, texsize[mid].w2, texsize[mid].h)
     end
   end
 end
@@ -844,6 +894,12 @@ local function tick()
     for x=1,width-1 do
       if cells[y][x].sticky_moved then
         cells[y][x].sticky_moved = false
+      -- elseif cells[y][x].is_hidden_player then
+      --   cells[y][x].ctype = ids.player
+      --   SetChunk(x, y, ids.player)
+      elseif cells[y][x].ctype == 0 then
+        cells[y][x].mech_signal = 0
+        cells[y][x].is_hidden_player = false
       end
     end
   end
@@ -859,14 +915,27 @@ end
 
 local function onPlace(id, x, y, rot, original, originalInitial)
   cells[y][x].mech_signal = 0
+  cells[y][x].is_hidden_player = false
 
   if original.ctype == ids.monitor and id ~= ids.monitor and id ~= 0 then
     cells[y][x] = original
     initial[y][x] = originalInitial
 
     cells[y][x].monitor_torender = id
+  elseif id == ids.player and econfig['player_lock'] == true then
+    for cy=1,height-1 do
+      for cx=1,width-1 do
+        if (cells[cy][cx].ctype == ids.player or cells[cy][cx].is_hidden_player) and (cx ~= x or cy ~= y) then
+          cells[y][x] = original
+          initial[y][x] = originalInitial
+          return
+        end
+      end
+    end
   end
 end
+
+local gridRotation = 0
 
 local function onGridRender()
   if not (paused) then
@@ -875,6 +944,29 @@ local function onGridRender()
         local id = cells[y][x].ctype
         if cells[y][x].ctype == ids.lightBulb or id == ids.brightLightBulb or id == ids.brighterLightBulb or id == ids.brightestLightBulb then
           DoLightbulb(x, y)
+        elseif (id == ids.player or (cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0)) and not inmenu then
+          if econfig['player_lock'] == true then
+
+            zoom = econfig['player_zoom'] or 100
+            local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
+        
+            local center = {
+              x = love.graphics.getWidth() * 0.5,
+              y = love.graphics.getHeight() * 0.5,
+            }
+        
+            -- Translate
+            spos.x = spos.x - center.x
+            spos.y = spos.y - center.y
+        
+            -- Smooth
+            -- local i = 0.3
+            -- spos.x = spos.x * i
+            -- spos.y = spos.y * i
+        
+            offx = lerp(offx, offx + spos.x, itime/delay)
+            offy = lerp(offy, offy + spos.y, itime/delay)
+          end
         end
       end
     end
@@ -945,6 +1037,43 @@ end
 --   end
 -- end
 
+local playTime = 0
+
+local function customupdate(dt)
+  
+end
+
+local function onKeyPressed(key, code, continous)
+  -- Do rotation for player
+  if not continous then
+    if not (inmenu or paused) then
+      if key == 'j' then
+        for y=1,height-1 do
+          for x=1,width-1 do
+            if cells[y][x].ctype == ids.player or cells[y][x].is_hidden_player then
+              rotateCell(x, y, -1)
+            end
+          end
+        end
+      elseif key == 'l' then
+        for y=1,height-1 do
+          for x=1,width-1 do
+            if cells[y][x].ctype == ids.player or cells[y][x].is_hidden_player then
+              rotateCell(x, y, 1)
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+local function onCellGenerated(id, x, y)
+  if cells[y][x].is_hidden_player then
+    cells[y][x].is_hidden_player = false
+  end
+end
+
 return {
   init = init,
   update = update,
@@ -954,5 +1083,8 @@ return {
   onTrashEats = onTrashEats,
   onEnemyDies = onEnemyDies,
   onMove = onMove,
+  onKeyPressed = onKeyPressed,
   onGridRender = onGridRender,
+  customupdate = customupdate,
+  onCellGenerated = onCellGenerated,
 }

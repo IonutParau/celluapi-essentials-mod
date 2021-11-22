@@ -6,7 +6,15 @@ IsEssentials = true
 
 HALF_PI = math.pi / 2
 
+function LerpRotation(old, new)
+  return lerp(old,old+((new-old+2)%4-2),itime/delay)
+end
+
 local econfig = json.decode(love.filesystem.read("Essentials/config.json") or "{}", 0, 'null')
+
+function GetEssentialsConfig()
+  return CopyTable(econfig)
+end
 
 local Ereturns = {}
 
