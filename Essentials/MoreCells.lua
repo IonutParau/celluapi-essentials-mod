@@ -353,25 +353,10 @@ function UpdateCell(id, x, y, dir)
   elseif id == 54 then
     DoSuperGenerator(x,y,dir)
 		supdatekey = supdatekey + 1
-  elseif id > initialCellCount and id ~= heaterID then
-    DoModded(id, x, y, dir)
+  elseif id > initialCellCount then
+    DoModded(x, y, dir)
   end
 end
-
-function DoHeater(x, y)
-  local offs = {
-    {x=1,y=0},
-    {x=-1,y=0},
-    {x=0,y=1},
-    {x=0,y=-1},
-  }
-
-  for _, off in ipairs(offs) do
-    local ox = x + off.x
-    local oy = y + off.y
-    UpdateCell(cells[oy][ox].ctype, ox, oy, cells[oy][ox].rot)
-  end
-end 
 
 local function equals(a, b)
   if type(a) ~= type(b) then return false end
