@@ -475,7 +475,9 @@ local function init()
   giveSubtick(ids.piston, DoModded)
   giveSubtick(ids.stickyPiston, DoModded)
 
-  ids.fan = addCell("EMC fan", texp .. "fan.png")
+  ids.fan = addCell("EMC fan", texp .. "fans/fan.png")
+  ids.strongfan = addCell("EMC strong-fan", texp .. "fans/strongfan.png")
+  ids.hyperfan = addCell("EMC hyper-fan", texp .. "fans/hyperfan.png")
   ids.conveyor = addCell("EMC conveyor", texp .. "conveyor.png")
   ids.monitor = addCell("EMC monitor", texp .. "monitor.png")
   ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true})
@@ -549,7 +551,10 @@ local function init()
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
-    movCat:AddItem("Fan", "Pushes cells in front of it constantly", ids.fan)
+    local fanCat = movCat:AddCategory("Fans", "They create a constant force pushing cells in front.", texp .. "fans/fan.png")
+    fanCat:AddItem("Fan", "Only pushes cells directly in front of it", ids.fan)
+    fanCat:AddItem("Super Fan", "Has a range of 2 cell units", ids.strongfan)
+    fanCat:AddItem("Hyper Fan", "Has a range of 4 cell units", ids.hyperfan)
     movCat:AddItem("Conveyor Cell", "Pushes the cells on its sides forward", ids.conveyor)
     movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
 
@@ -689,6 +694,29 @@ local function DoMagnet(x, y, dir)
   PullCell(pullX, pullY, dir, false, 1)
 end
 
+local function DoFan(x, y, dir)
+  local id = cells[y][x].ctype
+  local fx, fy = x, y
+  local px, py = x, y
+
+  local range = 1
+  if id == ids.strongfan then range = 2 end
+  if id == ids.hyperfan then range = 4 end
+
+  for i=1,range do
+    px, py = fx, fy
+    fx, fy = GetFullForward(fx, fy, dir)
+    local f = walkDivergedPath(px, py, fx, fy)
+    dir = f.dir
+    fx = f.x
+    fy = f.y
+
+    local front = CopyTable(cells[fy][fx])
+
+    if PushCell(px, py, dir, true, 1) and front.ctype ~= 0 then return end
+  end
+end
+
 local function update(id, x, y, dir)
   if id == ids.motionSensor then
     DoMotionSensor(x, y, dir)
@@ -724,8 +752,8 @@ local function update(id, x, y, dir)
     Do4Rep(x, y)
   elseif id == ids.slideopener then
     DoSlideOpener(x, y, dir)
-  elseif id == ids.fan then
-    PushCell(x, y, dir)
+  elseif id == ids.fan or id == ids.strongfan or id == ids.hyperfan then
+    DoFan(x, y, dir)
   elseif id == ids.conveyor then
     DoConveyor(x, y, dir)
   elseif id == ids.magnet then
