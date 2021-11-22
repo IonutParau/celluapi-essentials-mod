@@ -11,25 +11,29 @@ local half_pi = math.pi / 2
 
 local MAX_MECH = 2
 
-function UpdateCell(id, x, y, dir)
+function UpdateCell(id, x, y, dir, isPlayer)
   if id == 1 then
     DoMover(x, y, dir)
   elseif id == 2 or id == 39 or id == 22 then
     DoGenerator(x,y,dir,dir,id == 39)
     if id == 22 then
       dir = (dir-1)%4
-      DoGenerator(x,y,dir,dir,false)
+      DoGenerator(x,y,dir,dir,dir%2 == 0)
     end
+    cells[y][x].is_hidden_player = isPlayer
   elseif id == 25 then
     DoGenerator(x, y, (dir-1)%4, dir)
+    cells[y][x].is_hidden_player = isPlayer
   elseif id == 26 then
     DoGenerator(x, y, (dir+1)%4, dir)
+    cells[y][x].is_hidden_player = isPlayer
   elseif id == 44 or id == 45 then
     DoReplicator(x,y,dir,id ~= 45)
     if id == 45 then
       dir = (dir-1)%4
       DoReplicator(x,y,dir,false)
     end
+    cells[y][x].is_hidden_player = isPlayer
   elseif id == 29 then
     for i=-1,1,2 do	--when lazy
       if cells[y][x+i].ctype == 8 then cells[y][x+i].ctype = 9 
@@ -1080,7 +1084,7 @@ local function DoPlayer(x, y, dir, recursive)
     if cells[y][x].ctype == ids.player then
       DoMover(x, y, dir)
     else
-      UpdateCell(cells[y][x].ctype, x, y, dir)
+      UpdateCell(cells[y][x].ctype, x, y, dir, true)
     end
   end
   if love.keyboard.isDown('k') then
