@@ -790,7 +790,12 @@ local function DoPortal(id, x, y, food, fx, fy)
     -- Portal tiem
     local relativeDir = DirFromOff(fx - x, fy - y)
     local sx, sy = seeker[1], seeker[2]
-    PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir})
+    if PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir}) then
+      if food.is_hidden_player then
+        local sfx, sfy = GetFullForward(sx, sy, relativeDir)
+        cells[sfy][sfx].is_hidden_player = true
+      end
+    end
   end
 end
 
