@@ -7,8 +7,6 @@ if IsEssentials then
   econfig = GetEssentialsConfig()
 end
 
-local emc_halfdelay = false
-
 local half_pi = math.pi / 2
 
 local MAX_MECH = 2
@@ -687,6 +685,8 @@ local function canPush(fx, fy, dir)
     return (cells[fy][fx].rot == dir or cells[fy][fx].rot == (dir-1)%4 or cells[fy][fx].rot == (dir+1)%4)
   elseif cells[fy][fx].ctype == 53 then -- Slide opposition
     return (cells[fy][fx].rot ~= (dir+2)%4)
+  elseif cells[fy][fx].ctype == ids.trashMover then
+    return (cells[fy][fx].rot ~= dir)
   end
 
   return true
@@ -738,14 +738,12 @@ local function DoTrashMover(x, y, dir)
       }
     end
     if id ~= 0 then
-      destroysound:play()
-    end
-    if id ~= 0 and not (id == ids.trashMover and front.rot == dir and not cells[y][x].is_hidden_player) then
       cells[fy][fx] = {
         ctype = 0,
         rot = 0,
         lastvars = {fx, fy, 0}
       }
+      destroysound:play()
     end
     FakeMoveForward(x, y, dir)
   end
@@ -765,15 +763,91 @@ local function backOnlySided(x, y, dir)
   return (dir == (cells[y][x].rot))
 end
 
+local function DoPortal(id, x, y, food, fx, fy)
+  local seeking = ids.portal_b
 
-local function DoSlowness(x, y)
-  if emc_halfdelay then
-    for dir=0,3 do
-      local ox, oy = GetFullForward(x, y, dir)
-      local oid = cells[oy][ox].ctype
-      if oid ~= ids.slowness then
-        cells[oy][ox].updated = true
+  if id == seeking then seeking = ids.portal_a end
+
+  local fdir = (food.rot + 2) % 4
+
+  local closestDist = 1/0
+  local seeker = {x, y}
+  -- Ah yes, PERFORMANCE
+  for sy=1,height-1 do
+    for sx=1,width-1 do
+      if cells[sy][sx].ctype == seeking then
+        local dist = math.pow(sx - x, 2) + math.pow(sy - y, 2)
+        if closestDist > dist then
+          closestDist = dist
+          seeker = {sx, sy}
+        end
       end
+    end
+  end
+
+  -- Now we get to the portal-ing
+  if seeker then
+    -- Portal tiem
+    local relativeDir = DirFromOff(fx - x, fy - y)
+    local sx, sy = seeker[1], seeker[2]
+    PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir})
+  end
+end
+
+local playerPosCache
+
+local function getPlayerPos()
+  if playerPosCache then
+    return playerPosCache[1], playerPosCache[2]
+  end
+
+  for y=1,height-1 do
+    for x=1,width-1 do
+      if cells[y][x].ctype == ids.player or cells[y][x].is_hidden_player then
+        playerPosCache = {x, y}
+        return x, y
+      end
+    end
+  end
+  
+  return nil, nil
+end
+
+-- This wil lcome in handy later :)
+local function DoSeeker(x, y, dir)
+  local px, py = getPlayerPos()
+
+  if px == nil then return end
+
+  local dx, dy = px - x, py - y
+
+  local ox, oy = dx, dy
+
+  if math.abs(ox) <= 1 and math.abs(oy) <= 1 then
+    cells[py][px] = {
+      ctype = 0,
+      rot = 0,
+      lastvars = {
+        px, py, 0
+      }
+    }
+  else
+    local mdir = nil
+
+    if dx > 0 then
+      mdir = 0
+    elseif dx < 0 then
+      mdir = 2
+    elseif dy > 0 then
+      mdir = 1
+    elseif dy < 0 then
+      mdir = 3
+    end
+
+    if type(mdir) == "number" then
+      cells[y][x].rot = mdir
+      local bx, by = GetFullForward(x, y, mdir, -1)
+      PushCell(bx, by, mdir, true, 0)
     end
   end
 end
@@ -819,13 +893,15 @@ local function init()
   ids.monitor = addCell("EMC monitor", texp .. "monitor.png")
   ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true})
   ids.player = addCell("EMC player", texp .. "player.png", Options.combine(Options.mover, Options.ungenable))
-  ids.diagmirror = addCell("EMC diag-mirror", placeholder)
-  ids.slowness = addCell("EMC slowness", placeholder, Options.neverupdate)
-  table.insert(subticks, 1, GenerateSubtick(ids.slowness, DoSlowness, true))
+  ids.seeker = addCell("EMC seeker", texp .. "seeker.png", {type="mover"})
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
   addFlipperTranslation(1, 13)
+
+  -- Portals
+  ids.portal_a = addCell("EMC portal-a", texp .. "portals/a.png", Options.combine(Options.trash, Options.neverupdate))
+  ids.portal_b = addCell("EMC portal-b", texp .. "portals/b.png", Options.combine(Options.trash, Options.neverupdate))
 
   -- Add useful stuff
   local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash", dontupdate = true})
@@ -843,8 +919,8 @@ local function init()
 
   ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash))
 
-  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true, silent = true})
-  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true, silent = true})
+  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true})
+  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true})
 
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
@@ -894,7 +970,6 @@ local function init()
     destCat:AddItem("Ghost Trash", "Trash cell that can't be generated", ids.ghostTrash)
 
     local movCat = Toolbar:GetCategory("Movers")
-    movCat:AddItem("Diagonal mirror", "Mirror but diagonal", ids.diagmirror)
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
     
@@ -917,8 +992,10 @@ local function init()
     local uniqueCat = Toolbar:GetCategory("Unique cells")
     uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595\nWhen placing a cell on a monitor, the monitor will display that cell", ids.monitor)
     uniqueCat:AddItem("The Musical Cell", "\"At last, it has come.\" \nIs a trash cell but plays a special sound based off of where the cell came from.", ids.musical)
-    uniqueCat:AddItem("Player Cell", "Cell that can be controlled by the I, J and L keys", ids.player)
-    uniqueCat:AddItem("Slowness", "Slows down nearby cells", ids.slowness)
+    uniqueCat:AddItem("Player Cell", "Cell that can be controlled by the I, J and L keys. You can even control multiple at once!", ids.player)
+    uniqueCat:AddItem("Seeker Cell", "Hunts down players. Just make sure it doesn't get too close", ids.seeker)
+    uniqueCat:AddItem("Portal A", "When something falls in, it gets sent to the nearest portal B", ids.portal_a)
+    uniqueCat:AddItem("Portal B", "When something falls in, it gets sent to the nearest portal A", ids.portal_b)
   end
 end
 
@@ -1073,10 +1150,19 @@ local function DoPlayer(x, y, dir, recursive)
     if cells[y][x].ctype == ids.player then
       DoMover(x, y, dir)
     else
+      local fx, fy = GetFullForward(x, y, dir)
       UpdateCell(cells[y][x].ctype, x, y, dir, true)
+      if cells[fy][fx].is_hidden_player and cells[y][x].is_hidden_player then
+        cells[y][x] = {
+          ctype = 0,
+          rot = 0,
+          lastvars = {
+            x, y, 0,
+          }
+        }
+      end
     end
-  end
-  if love.keyboard.isDown('k') then
+  elseif love.keyboard.isDown('k') then
     -- Kopy ability
     local fx, fy = GetFullForward(x, y, dir)
     if cells[fy][fx].ctype ~= 0 and cells[fy][fx].ctype ~= 40 and cells[fy][fx].ctype ~= -1 then
@@ -1100,59 +1186,6 @@ local function fixPlayerHidedness()
         DoPlayer(x, y, cells[y][x].rot)
       end
     end
-  end
-end
-
-local function CanMirror(mx, my, x, y, dir)
-  --local x, y = GetFullForward(mx, my, dir)
-  local id = cells[y][x].ctype
-  if id == -1 or id == 40 then
-    return false
-  elseif id == 11 or (isModdedTrash(id) or ((GetSidedTrash(id) ~= nil and GetSidedTrash(id)(x, y, dir) == false))) then
-    return false
-  elseif id == 50 then
-    return false
-  elseif id == 55 then
-    return false
-  elseif id == 40 then
-    return false
-  elseif id == 14 and (cells[y][x].rot%2 ~= dir%2) then
-    return false
-  elseif id == ids.diagmirror then
-    return false
-  elseif id > initialCellCount then
-    return canPushCell(x, y, mx, my, "mirror")
-  end
-  
-  return true
-end
-
-local function DoDiagMirror(x, y, dir)
-  local ldir = dir
-  local rdir = (dir+2)%4
-
-  local lx, ly = GetFullForward(x, y, dir)
-  local rx, ry = GetFullForward(x, y, rdir)
-  local u = GetForward((dir-1)%4)
-  local ux, uy = u.x, u.y
-  local d = GetForward((dir+1)%4)
-  local dx, dy = d.x, d.y
-
-  local dx1, dy1 = ux + lx, uy + ly
-  local dx2, dy2 = dx + rx, dy + ry
-
-  -- cells[dy2][dx2].ctype = 40
-  -- cells[dy1][dx1].ctype = 40
-
-  local mirroring = {
-    left = CanMirror(x, y, ux + lx, uy + ly, ldir),
-    right = CanMirror(x, y, rx + dx, ry + dy, rdir)
-  }
-
-  if mirroring.left and mirroring.right then
-    local old = CopyCell(ux + lx, uy + ly)
-    cells[uy + ly][ux + lx] = cells[ry + dy][rx + dx]
-    cells[ry + dy][rx + dx] = old
   end
 end
 
@@ -1199,8 +1232,8 @@ local function update(id, x, y, dir)
     DoMagnet(x, y, dir)
   elseif id == ids.player then
     DoPlayer(x, y, dir)
-  elseif id == ids.diagmirror then
-    DoDiagMirror(x, y, dir)
+  elseif id == ids.seeker then
+    DoSeeker(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1209,16 +1242,9 @@ local function update(id, x, y, dir)
   end
 end
 
-local playerOverlay = MakeTexture(texp .. "player_overlay.png")
-
 local function onCellDraw(id, x, y, rot)
   local rrot = LerpRotation((cells[y][x].lastvars or {x, y, rot})[3], rot)
 
-  if cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0 and not (econfig["player_lock"] == true) then
-    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
-    love.graphics.draw(playerOverlay.tex, spos.x, spos.y, rrot * half_pi, zoom/playerOverlay.size.w, zoom/playerOverlay.size.h, playerOverlay.size.w2, playerOverlay.size.h2)
-  end
-  
   if id == ids.wire then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
     local renderArm = function(r)
@@ -1295,7 +1321,7 @@ local function onCellDraw(id, x, y, rot)
 end
 
 local function tick()
-  emc_halfdelay = not emc_halfdelay
+  playerPosCache = nil
   for y=1,height-1 do
     for x=1,width-1 do
       if cells[y][x].sticky_moved then
@@ -1350,8 +1376,7 @@ local function onGridRender()
         local id = cells[y][x].ctype
         if cells[y][x].ctype == ids.lightBulb or id == ids.brightLightBulb or id == ids.brighterLightBulb or id == ids.brightestLightBulb then
           DoLightbulb(x, y)
-        end
-        if (id == ids.player or (cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0)) and not inmenu then
+        elseif (id == ids.player or (cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0)) and not inmenu then
           if econfig['player_lock'] == true then
 
             zoom = econfig['player_zoom'] or 100
@@ -1430,6 +1455,8 @@ local function onTrashEats(id, x, y, food, fx, fy)
       end
     end
     playSound(sounds[dir+1])
+  elseif id == ids.portal_a or id == ids.portal_b then
+    DoPortal(id, x, y, food, fx, fy)
   end
 end
 
