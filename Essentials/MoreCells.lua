@@ -7,6 +7,8 @@ if IsEssentials then
   econfig = GetEssentialsConfig()
 end
 
+local emc_halfdelay = false
+
 local half_pi = math.pi / 2
 
 local MAX_MECH = 2
@@ -716,8 +718,6 @@ local function canPush(fx, fy, dir)
     return (cells[fy][fx].rot == dir or cells[fy][fx].rot == (dir-1)%4 or cells[fy][fx].rot == (dir+1)%4)
   elseif cells[fy][fx].ctype == 53 then -- Slide opposition
     return (cells[fy][fx].rot ~= (dir+2)%4)
-  elseif cells[fy][fx].ctype == ids.trashMover then
-    return (cells[fy][fx].rot ~= dir)
   end
 
   return true
@@ -769,12 +769,14 @@ local function DoTrashMover(x, y, dir)
       }
     end
     if id ~= 0 then
+      destroysound:play()
+    end
+    if id ~= 0 and not (id == ids.trashMover and front.rot == dir and not cells[y][x].is_hidden_player) then
       cells[fy][fx] = {
         ctype = 0,
         rot = 0,
         lastvars = {fx, fy, 0}
       }
-      destroysound:play()
     end
     FakeMoveForward(x, y, dir)
   end
@@ -792,6 +794,19 @@ end
 
 local function backOnlySided(x, y, dir)
   return (dir == (cells[y][x].rot))
+end
+
+
+local function DoSlowness(x, y)
+  if emc_halfdelay then
+    for dir=0,3 do
+      local ox, oy = GetFullForward(x, y, dir)
+      local oid = cells[oy][ox].ctype
+      if oid ~= ids.slowness then
+        cells[oy][ox].updated = true
+      end
+    end
+  end
 end
 
 local function init()
@@ -835,6 +850,9 @@ local function init()
   ids.monitor = addCell("EMC monitor", texp .. "monitor.png")
   ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true})
   ids.player = addCell("EMC player", texp .. "player.png", Options.combine(Options.mover, Options.ungenable))
+  ids.diagmirror = addCell("EMC diag-mirror", placeholder)
+  ids.slowness = addCell("EMC slowness", placeholder, Options.neverupdate)
+  table.insert(subticks, 1, GenerateSubtick(ids.slowness, DoSlowness, true))
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -856,8 +874,8 @@ local function init()
 
   ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash))
 
-  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true})
-  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true})
+  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true, silent = true})
+  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true, silent = true})
 
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
@@ -907,6 +925,7 @@ local function init()
     destCat:AddItem("Ghost Trash", "Trash cell that can't be generated", ids.ghostTrash)
 
     local movCat = Toolbar:GetCategory("Movers")
+    movCat:AddItem("Diagonal mirror", "Mirror but diagonal", ids.diagmirror)
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
     
@@ -929,7 +948,8 @@ local function init()
     local uniqueCat = Toolbar:GetCategory("Unique cells")
     uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595\nWhen placing a cell on a monitor, the monitor will display that cell", ids.monitor)
     uniqueCat:AddItem("The Musical Cell", "\"At last, it has come.\" \nIs a trash cell but plays a special sound based off of where the cell came from.", ids.musical)
-    uniqueCat:AddItem("Player Cell", "Cell that can be controlled by the I, J and L keys. You can even control multiple at once!", ids.player)
+    uniqueCat:AddItem("Player Cell", "Cell that can be controlled by the I, J and L keys", ids.player)
+    uniqueCat:AddItem("Slowness", "Slows down nearby cells", ids.slowness)
   end
 end
 
@@ -1114,6 +1134,59 @@ local function fixPlayerHidedness()
   end
 end
 
+local function CanMirror(mx, my, x, y, dir)
+  --local x, y = GetFullForward(mx, my, dir)
+  local id = cells[y][x].ctype
+  if id == -1 or id == 40 then
+    return false
+  elseif id == 11 or (isModdedTrash(id) or ((GetSidedTrash(id) ~= nil and GetSidedTrash(id)(x, y, dir) == false))) then
+    return false
+  elseif id == 50 then
+    return false
+  elseif id == 55 then
+    return false
+  elseif id == 40 then
+    return false
+  elseif id == 14 and (cells[y][x].rot%2 ~= dir%2) then
+    return false
+  elseif id == ids.diagmirror then
+    return false
+  elseif id > initialCellCount then
+    return canPushCell(x, y, mx, my, "mirror")
+  end
+  
+  return true
+end
+
+local function DoDiagMirror(x, y, dir)
+  local ldir = dir
+  local rdir = (dir+2)%4
+
+  local lx, ly = GetFullForward(x, y, dir)
+  local rx, ry = GetFullForward(x, y, rdir)
+  local u = GetForward((dir-1)%4)
+  local ux, uy = u.x, u.y
+  local d = GetForward((dir+1)%4)
+  local dx, dy = d.x, d.y
+
+  local dx1, dy1 = ux + lx, uy + ly
+  local dx2, dy2 = dx + rx, dy + ry
+
+  -- cells[dy2][dx2].ctype = 40
+  -- cells[dy1][dx1].ctype = 40
+
+  local mirroring = {
+    left = CanMirror(x, y, ux + lx, uy + ly, ldir),
+    right = CanMirror(x, y, rx + dx, ry + dy, rdir)
+  }
+
+  if mirroring.left and mirroring.right then
+    local old = CopyCell(ux + lx, uy + ly)
+    cells[uy + ly][ux + lx] = cells[ry + dy][rx + dx]
+    cells[ry + dy][rx + dx] = old
+  end
+end
+
 local function update(id, x, y, dir)
   if id == ids.motionSensor then
     DoMotionSensor(x, y, dir)
@@ -1157,6 +1230,8 @@ local function update(id, x, y, dir)
     DoMagnet(x, y, dir)
   elseif id == ids.player then
     DoPlayer(x, y, dir)
+  elseif id == ids.diagmirror then
+    DoDiagMirror(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1165,9 +1240,16 @@ local function update(id, x, y, dir)
   end
 end
 
+local playerOverlay = MakeTexture(texp .. "player_overlay.png")
+
 local function onCellDraw(id, x, y, rot)
   local rrot = LerpRotation((cells[y][x].lastvars or {x, y, rot})[3], rot)
 
+  if cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0 and not (econfig["player_lock"] == true) then
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
+    love.graphics.draw(playerOverlay.tex, spos.x, spos.y, rrot * half_pi, zoom/playerOverlay.size.w, zoom/playerOverlay.size.h, playerOverlay.size.w2, playerOverlay.size.h2)
+  end
+  
   if id == ids.wire then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
     local renderArm = function(r)
@@ -1244,6 +1326,7 @@ local function onCellDraw(id, x, y, rot)
 end
 
 local function tick()
+  emc_halfdelay = not emc_halfdelay
   for y=1,height-1 do
     for x=1,width-1 do
       if cells[y][x].sticky_moved then
@@ -1298,7 +1381,8 @@ local function onGridRender()
         local id = cells[y][x].ctype
         if cells[y][x].ctype == ids.lightBulb or id == ids.brightLightBulb or id == ids.brighterLightBulb or id == ids.brightestLightBulb then
           DoLightbulb(x, y)
-        elseif (id == ids.player or (cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0)) and not inmenu then
+        end
+        if (id == ids.player or (cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0)) and not inmenu then
           if econfig['player_lock'] == true then
 
             zoom = econfig['player_zoom'] or 100

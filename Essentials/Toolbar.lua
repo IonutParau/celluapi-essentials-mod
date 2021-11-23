@@ -90,7 +90,7 @@ function ToolbarSystem.Item()
 end
 
 local function FixItems(self)
-  if #(self.items) % 16 == 0 and #(self.items) >= 16 then
+  if #(self.items) % 16 == 0 and #(self.items) >= 16 and self ~= Toolbar then
     self:AddItem("Back", "Takes you back", backp)
   end
 end
@@ -114,8 +114,8 @@ local function AddCategory(self, name, description, image)
   }
   c:AddItem("Back", "Takes you back", backp)
   c.hypercat = self
-  table.insert(self.items, c)
   self:FixItems()
+  table.insert(self.items, c)
   return c
 end
 
@@ -129,10 +129,10 @@ local function AddItem(self, name, description, cellID)
   i.display = name
   i.description = description
   i.image = getRealID(cellID) or cellID
-  table.insert(self.items, i)
   if cellID ~= backp then
     self:FixItems()
   end
+  table.insert(self.items, i)
   return i
 end
 

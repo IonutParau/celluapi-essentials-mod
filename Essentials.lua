@@ -180,6 +180,12 @@ local function onKeyPressed(key, code, continuous)
   --     essentialsMenu = not essentialsMenu
   --   end
   -- end
+  if not continuous then
+    if key == 'z' and not love.keyboard.isDown('lctrl') then
+      local full = love.window.getFullscreen()
+      love.window.setFullscreen(not full)
+    end
+  end
 end
 
 local function onGridRender()
