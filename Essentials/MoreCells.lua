@@ -324,38 +324,7 @@ function UpdateCell(id, x, y, dir, isPlayer)
       end
     end
   elseif id == 43 then
-    local canPushUp = true
-    local canPushDown = true
-    if cells[y-1] ~= nil then
-      if cells[y-1][x].ctype > initialCellCount then
-        canPushUp = canPushCell(x, y-1, x, y, "mirror")
-      end
-    end
-    if cells[y+1] ~= nil then
-      if cells[y+1][x].ctype > initialCellCount then
-        canPushDown = canPushCell(x, y+1, x, y, "mirror")
-      end
-    end
-    if cells[y-1] ~= nil then
-      if isModdedTrash(cells[y-1][x].ctype) or ((GetSidedTrash(cells[y-1][x].ctype) ~= nil and GetSidedTrash(cells[y-1][x].ctype)(x, y-1, 3) == false)) then
-        canPushUp = false
-      end
-    end
-    if cells[y+1] ~= nil then
-      if isModdedTrash(cells[y+1][x].ctype) or ((GetSidedTrash(cells[y+1][x].ctype) ~= nil and GetSidedTrash(cells[y+1][x].ctype)(x, y+1, 3) == false)) then
-        canPushDown = false
-      end
-    end
-    if not cells[y][x].updated and (cells[y][x].ctype == 14 and (cells[y][x].rot == 1 or cells[y][x].rot == 3) or cells[y][x].ctype == 55) then
-      if cells[y-1][x].ctype ~= 11 and cells[y-1][x].ctype ~= 55 and cells[y-1][x].ctype ~= 50 and cells[y-1][x].ctype ~= -1 and cells[y-1][x].ctype ~= 40 and (cells[y-1][x].ctype ~= 14 or cells[y-1][x].rot%2 == 0)
-      and cells[y+1][x].ctype ~= 11 and cells[y+1][x].ctype ~= 55 and cells[y+1][x].ctype ~= -1 and cells[y+1][x].ctype ~= 40 and (cells[y+1][x].ctype ~= 14 or cells[y+1][x].rot%2 == 0) and canPushUp and canPushDown or config['mirror_restrictions'] ~= 'true' then
-        local oldcell = CopyCell(x,y-1)
-        cells[y-1][x] = CopyCell(x,y+1)
-        cells[y+1][x] = oldcell
-        SetChunk(x,y-1,cells[y-1][x].ctype)
-        SetChunk(x,y+1,cells[y+1][x].ctype)
-      end
-    end
+    DoIntaker(x, y, dir)
   elseif id == 54 then
     DoSuperGenerator(x,y,dir)
 		supdatekey = supdatekey + 1
