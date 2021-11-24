@@ -831,13 +831,17 @@ local function DoPortal(id, x, y, food, fx, fy)
   -- Now we get to the portal-ing
   if seeker then
     -- Portal tiem
-    local relativeDir = DirFromOff(fx - x, fy - y)
+    local relativeDir = DirFromOff(fx - x, fy - y) or cells[y][x].rot
     local sx, sy, sdir = seeker[1], seeker[2], seeker[3]
     --relativeDir = (relativeDir + sdir - cells[y][x].rot) % 4
     if PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir}) then
       if food.is_hidden_player then
         local sfx, sfy = GetFullForward(sx, sy, relativeDir)
         cells[sfy][sfx].is_hidden_player = true
+      end
+      if food.player_hidden_type then
+        local sfx, sfy = GetFullForward(sx, sy, relativeDir)
+        cells[sfy][sfx].ctype = food.player_hidden_type
       end
     end
   end
@@ -943,8 +947,8 @@ local function init()
   ids.strongfan = addCell("EMC strong-fan", texp .. "fans/strongfan.png")
   ids.hyperfan = addCell("EMC hyper-fan", texp .. "fans/hyperfan.png")
   ids.conveyor = addCell("EMC conveyor", texp .. "conveyor.png")
-  ids.monitor = addCell("EMC monitor", texp .. "monitor.png")
-  ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true})
+  ids.monitor = addCell("EMC monitor", texp .. "monitor.png", Options.neverupdate)
+  ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true, dontupdate = true})
   ids.player = addCell("EMC player", texp .. "player.png", Options.combine(Options.mover, Options.ungenable))
   ids.seeker = addCell("EMC seeker", texp .. "seeker.png", {type="mover"})
   ToggleFreezability(ids.player)
@@ -953,7 +957,7 @@ local function init()
   addFlipperTranslation(1, 13)
 
   -- Portals
-  local portalOptions = {type = "trash", dontupdate = true}
+  local portalOptions = {type = "trash", dontupdate = true, silent = true}
   ids.portal_a = addCell("EMC portal-a", texp .. "portals/a.png", portalOptions)
   ids.portal_b = addCell("EMC portal-b", texp .. "portals/b.png", portalOptions)
 
@@ -1208,37 +1212,39 @@ end
 
 local function DoPlayer(x, y, dir, recursive)
   cells[y][x].updated = true
-  if love.keyboard.isDown('i') and not recursive then
-    if cells[y][x].ctype == ids.player then
-      DoMover(x, y, dir)
+  if love.keyboard.isDown('up') and not recursive then
+    if love.keyboard.isDown('lshift') then
+      local bx, by = GetFullForward(x, y, dir, -1)
+      local force = 1
+      local id = cells[y][x].ctype
+
+      if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
+        force = force - 1
+      end
+
+      if id == 21 or type(cellWeights[id]) == "number" then
+        force = force + (cellWeights[id] or 1)
+      end
+
+      PushCell(bx, by, dir, true, force)
     else
-      local fx, fy = GetFullForward(x, y, dir)
-      UpdateCell(cells[y][x].ctype, x, y, dir, true)
-      if cells[fy][fx].is_hidden_player and cells[y][x].is_hidden_player then
-        cells[y][x] = {
-          ctype = 0,
-          rot = 0,
-          lastvars = {
-            x, y, 0,
+      if cells[y][x].ctype == ids.player then
+        DoMover(x, y, dir)
+      else
+        local fx, fy = GetFullForward(x, y, dir)
+        UpdateCell(cells[y][x].ctype, x, y, dir, true)
+        if cells[fy][fx].is_hidden_player and cells[y][x].is_hidden_player then
+          cells[y][x] = {
+            ctype = 0,
+            rot = 0,
+            lastvars = {
+              x, y, 0,
+            }
           }
-        }
+        end
       end
     end
-  elseif love.keyboard.isDown('u') then
-    local id = cells[y][x].ctype
-    cells[y][x].ctype = 3
-    local bx, by = GetFullForward(x, y, dir, -1)
-
-    if PushCell(bx, by, dir, true, 1) then
-      local fx, fy = GetFullForward(x, y, dir)
-      local f = walkDivergedPath(x, y, fx, fy)
-      fx = f.x
-      fy = f.y
-      cells[fy][fx].ctype = id
-    else
-      cells[y][x].ctype = id
-    end
-  elseif love.keyboard.isDown('k') then
+  elseif love.keyboard.isDown('down') then
     -- Kopy ability
     local fx, fy = GetFullForward(x, y, dir)
     if cells[fy][fx].ctype ~= 0 and cells[fy][fx].ctype ~= 40 and cells[fy][fx].ctype ~= -1 then
@@ -1265,7 +1271,31 @@ local function fixPlayerHidedness()
   end
 end
 
+local function DoMusicalCell(sound)
+  local sounds = {
+    texp .. "sounds/piano1.wav",
+    texp .. "sounds/piano2.wav",
+    texp .. "sounds/piano3.wav",
+    texp .. "sounds/piano4.wav",
+  }
+  if audiocache[sounds[sound]] then
+    if audiocache[sounds[sound]]:isPlaying() then
+      audiocache[sounds[sound]]:stop()
+    end
+  end
+  playSound(sounds[sound])
+end
+
 local function update(id, x, y, dir)
+  -- Some for fun stuff for player :)
+
+  if id == ids.monitor then
+    cells[y][x].monitor_torender = nil
+  elseif id == ids.musical then
+    DoMusicalCell(dir+1)
+  end
+
+  -- Actual updates
   if id == ids.motionSensor then
     DoMotionSensor(x, y, dir)
   elseif id == ids.delayer then
@@ -1402,6 +1432,10 @@ local function tick()
   playerPosCache = nil
   for y=1,height-1 do
     for x=1,width-1 do
+      if cells[y][x].player_hidden_type then
+        cells[y][x].ctype = cells[y][x].player_hidden_type
+        cells[y][x].player_hidden_type = nil
+      end
       if cells[y][x].sticky_moved then
         cells[y][x].sticky_moved = false
       -- elseif cells[y][x].is_hidden_player then
@@ -1421,21 +1455,6 @@ local function tick()
   --     table.remove(stickyQueue, 1)
   --   end
   -- until #stickyQueue == 0
-end
-
-local function DoMusicalCell(sound)
-  local sounds = {
-    texp .. "sounds/piano1.wav",
-    texp .. "sounds/piano2.wav",
-    texp .. "sounds/piano3.wav",
-    texp .. "sounds/piano4.wav",
-  }
-  if audiocache[sounds[sound]] then
-    if audiocache[sounds[sound]]:isPlaying() then
-      audiocache[sounds[sound]]:stop()
-    end
-  end
-  playSound(sounds[sound])
 end
 
 local function onPlace(id, x, y, rot, original, originalInitial)
@@ -1574,7 +1593,7 @@ local function onKeyPressed(key, code, continous)
   -- Do rotation for player
   if not continous then
     if not (inmenu or paused) then
-      if key == 'j' then
+      if key == 'left' then
         for y=1,height-1 do
           for x=1,width-1 do
             if cells[y][x].ctype == ids.player or cells[y][x].is_hidden_player then
@@ -1582,12 +1601,24 @@ local function onKeyPressed(key, code, continous)
             end
           end
         end
-      elseif key == 'l' then
+      elseif key == 'right' then
         for y=1,height-1 do
           for x=1,width-1 do
             if cells[y][x].ctype == ids.player or cells[y][x].is_hidden_player then
               rotateCell(x, y, 1)
             end
+          end
+        end
+      elseif key == 'up' or key == 'down' then
+        local px, py = getPlayerPos()
+        if type(px) == "number" and type(py) == "number" then
+          zoom = econfig['player_zoom'] or 100
+          if key == 'up' then
+            offx = (offx-400*winxm)*0.5
+            offy = (offy-300*winym)*0.5
+          elseif key == 'down' then
+            offx = offx*2 + 400*winxm
+            offy = offy*2 + 300*winym
           end
         end
       end
