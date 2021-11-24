@@ -109,13 +109,15 @@ local function loadResource(path)
         image = varParse(image)
         local img = love.graphics.newImage(image)
         key = Resourcer.FromIdentifier(key)
-        tex[key] = img
-        texsize[key] = {
-          w = img:getWidth(),
-          h = img:getHeight(),
-          w2 = img:getWidth()/2,
-          h2 = img:getHeight()/2,
-        }
+        if key ~= 0 then
+          tex[key] = img
+          texsize[key] = {
+            w = img:getWidth(),
+            h = img:getHeight(),
+            w2 = img:getWidth()/2,
+            h2 = img:getHeight()/2,
+          }
+        end
       end
     end
     if code["images"]["overlays"] then
