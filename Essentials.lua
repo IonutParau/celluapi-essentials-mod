@@ -90,6 +90,13 @@ end
 local function customupdate(dt)
   if Toolbar then DoToolbarUpdate() end
   if Resourcer then
+    if not loadedResourcer then
+      Resourcer.Settings({
+        trans_overlay = econfig['resourcer_overlay_transparency']
+      })
+      Resourcer.LoadResources(econfig['resourcer_path'])
+      loadedResourcer = true
+    end
     atime = atime + dt
     if atime > delay then
       atime = 0
@@ -123,13 +130,6 @@ local function customdraw()
   -- end
   if Toolbar then DoToolbarRender() end
   if Resourcer then
-    if not loadedResourcer then
-      Resourcer.Settings({
-        trans_overlay = econfig['resourcer_overlay_transparency']
-      })
-      Resourcer.LoadResources(econfig['resourcer_path'])
-      loadedResourcer = true
-    end
     Resourcer.RenderMouse()
     Resourcer.UpdateAnimations('ms', love.timer.getDelta() * 1000)
     Resourcer.UpdateAnimations('frame', 1)
