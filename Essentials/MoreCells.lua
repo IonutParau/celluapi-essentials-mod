@@ -1225,19 +1225,19 @@ local function DoPlayer(x, y, dir, recursive)
       end
     end
   elseif love.keyboard.isDown('u') then
-    local force = 1
     local id = cells[y][x].ctype
-    if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
-      force = 0
-    end
-    if type(cellWeights[id]) == "number" then
-      force = force + cellWeights[id]
-    end
-    if id == 21 then
-      force = force + 1
-    end
+    cells[y][x].ctype = 3
     local bx, by = GetFullForward(x, y, dir, -1)
-    PushCell(bx, by, dir, true, force)
+
+    if PushCell(bx, by, dir, true, 1) then
+      local fx, fy = GetFullForward(x, y, dir)
+      local f = walkDivergedPath(x, y, fx, fy)
+      fx = f.x
+      fy = f.y
+      cells[fy][fx].ctype = id
+    else
+      cells[y][x].ctype = id
+    end
   elseif love.keyboard.isDown('k') then
     -- Kopy ability
     local fx, fy = GetFullForward(x, y, dir)
