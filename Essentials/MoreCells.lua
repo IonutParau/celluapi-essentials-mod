@@ -260,7 +260,7 @@ function UpdateCell(id, x, y, dir, isPlayer)
   elseif id == 14 or id == 55 then
     local rotSide = (dir%2 == 0) or (id == 55)
     local rotUp = (dir%2 == 1) or (id == 55)
-    if rotSide then
+    if (dir%2 == 0) or (id == 55) then
       local canPushLeft = true
       local canPushRight = true
       if cells[y][x-1] ~= nil then
@@ -287,7 +287,8 @@ function UpdateCell(id, x, y, dir, isPlayer)
         SetChunk(x-1,y,cells[y][x-1].ctype)
         SetChunk(x+1,y,cells[y][x+1].ctype)
       end
-    elseif rotUp then
+    end
+    if (dir%2 == 1) or (id == 55) then
       local canPushUp = true
       local canPushDown = true
       if cells[y-1] ~= nil then
@@ -811,7 +812,7 @@ local function DoPortal(id, x, y, food, fx, fy)
 
   if id == seeking then seeking = ids.portal_a end
 
-  local fdir = (food.rot + 2) % 4
+  local fdir = food.rot
 
   local closestDist = 1/0
   local seeker = {x, y, cells[y][x].rot}
@@ -831,7 +832,7 @@ local function DoPortal(id, x, y, food, fx, fy)
   -- Now we get to the portal-ing
   if seeker then
     -- Portal tiem
-    local relativeDir = DirFromOff(fx - x, fy - y) or cells[y][x].rot
+    local relativeDir = (DirFromOff(fx - x, fy - y)+2)%4
     local sx, sy, sdir = seeker[1], seeker[2], seeker[3]
     --relativeDir = (relativeDir + sdir - cells[y][x].rot) % 4
     if PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir}) then
@@ -951,6 +952,8 @@ local function init()
   ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true, dontupdate = true})
   ids.player = addCell("EMC player", texp .. "player.png", Options.combine(Options.mover, Options.ungenable))
   ids.seeker = addCell("EMC seeker", texp .. "seeker.png", {type="mover"})
+  ids.matterBlob = addCell("EMC matter blob", texp .. "matter/blob.png", Options.combine(Options.mover, Options.invisible))
+  ids.matterConverter = addCell("EMC matter converter", texp .. "matter/converter.png")
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1062,6 +1065,8 @@ local function init()
     uniqueCat:AddItem("Seeker Cell", "Hunts down players. Just make sure it doesn't get too close", ids.seeker)
     uniqueCat:AddItem("Portal A", "When something falls in, it gets sent to the nearest portal B", ids.portal_a)
     uniqueCat:AddItem("Portal B", "When something falls in, it gets sent to the nearest portal A", ids.portal_b)
+    uniqueCat:AddItem("Matter Converter", "Converts the cell behind it to a matter blob", ids.matterConverter)
+    --uniqueCat:AddItem("Matter Blob", "", ids.matterBlob)
   end
 end
 
@@ -1214,34 +1219,83 @@ local function DoPlayer(x, y, dir, recursive)
   cells[y][x].updated = true
   if love.keyboard.isDown('up') and not recursive then
     if love.keyboard.isDown('lshift') then
-      local bx, by = GetFullForward(x, y, dir, -1)
-      local force = 1
       local id = cells[y][x].ctype
-
-      if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
-        force = force - 1
-      end
-
-      if id == 21 or type(cellWeights[id]) == "number" then
-        force = force + (cellWeights[id] or 1)
-      end
-
-      PushCell(bx, by, dir, true, force)
-    else
-      if cells[y][x].ctype == ids.player then
-        DoMover(x, y, dir)
-      else
+      if id == 11 or id == 12 or id == 23 or id == 50 or isModdedBomb(id) or isModdedTrash(id) then
         local fx, fy = GetFullForward(x, y, dir)
-        UpdateCell(cells[y][x].ctype, x, y, dir, true)
-        if cells[fy][fx].is_hidden_player and cells[y][x].is_hidden_player then
-          cells[y][x] = {
-            ctype = 0,
-            rot = 0,
-            lastvars = {
-              x, y, 0,
-            }
-          }
+        local fid = cells[fy][fx].ctype
+        if (fid == 0) or (fid ~= 11 and fid ~= 12 and fid ~= 23 and fid ~= 50 and (not isModdedBomb(fid)) and (not isModdedTrash(fid))) then
+          if PushCell(x, y, dir, true, 1) then
+            FakeMoveForward(x, y, dir)
+          end
+        else
+          if fid == 1 or fid == 50 or isModdedTrash(fid) then
+            cells[y][x].is_hidden_player = true
+            if isModdedTrash(fid) then
+              modsOnTrashEat(fid, fx, fy, cells[y][x], x, y)
+            elseif fid == 50 then
+              for odir=0,3 do
+                local ox, oy = GetFullForward(x, y, odir)
+                if inGrid(ox, oy) then
+                  cells[oy][ox] = {
+                    ctype = 0, rot = 0, lastvars = {ox, oy, 0}
+                  }
+                end
+              end
+            end
+            if not IsSilent(fid) then
+              destroysound:play()
+            end
+            cells[y][x].ctype = 0
+          elseif fid == 12 or fid == 23 or isModdedBomb(fid) then
+            if fid == 12 then
+              cells[fy][fx].ctype = 0
+            elseif fid == 23 then
+              cells[fy][fx].ctype = 12
+            elseif isModdedBomb(fid) then
+              cells[fy][fx].ctype = 0
+              modsOnModEnemyDed(fid, fx, fy, cells[y][x], x, y)
+            end
+            cells[y][x].ctype = 0
+            if not IsSilent(fid) then
+              destroysound:play()
+            end
+            enemyparticles:setPosition(fx*20,fy*20)
+						enemyparticles:emit(50)
+          end
         end
+      else
+        local bx, by = GetFullForward(x, y, dir, -1)
+        local force = 1
+
+        if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
+          force = force - 1
+        end
+
+        if id == 21 or type(cellWeights[id]) == "number" then
+          force = force + (cellWeights[id] or 1)
+        end
+
+        if PushCell(bx, by, dir, true, force, nil, nil, id == 46) then
+          -- Forcibly update
+          if id == 46 then
+            local fx, fy = GetFullForward(x, y, dir)
+            cells[fy][fx].updated = true
+          end
+        end
+      end
+    elseif cells[y][x].ctype == ids.player then
+      DoMover(x, y, dir)
+    else
+      local fx, fy = GetFullForward(x, y, dir)
+      UpdateCell(cells[y][x].ctype, x, y, dir, true)
+      if cells[fy][fx].is_hidden_player and cells[y][x].is_hidden_player then
+        cells[y][x] = {
+          ctype = 0,
+          rot = 0,
+          lastvars = {
+            x, y, 0,
+          }
+        }
       end
     end
   elseif love.keyboard.isDown('down') then
@@ -1284,6 +1338,35 @@ local function DoMusicalCell(sound)
     end
   end
   playSound(sounds[sound])
+end
+
+local function DoMatterBlob(x, y, dir)
+  local fx, fy = GetFullForward(x, y, dir)
+
+  if cells[fy][fx].ctype == 0 or cells[fy][fx].ctype == ids.matterBlob then
+    local bx, by = GetFullForward(x, y, dir, -1)
+    PushCell(bx, by, dir, true, 0)
+  else
+    cells[y][x] = (cells[y][x].matter_stored_cell or {ctype = 0, rot = 0, lastvars = {x, y, 0}})
+    cells[y][x].lastvars = {
+      x, y, cells[y][x].rot
+    }
+    SetChunk(x, y, cells[y][x].ctype)
+  end
+end
+
+local function DoMatterConverter(x, y, dir)
+  local bx, by = GetFullForward(x, y, dir, -1)
+
+  if cells[by][bx].ctype ~= 0 then
+    if PushCell(x, y, dir, true, 1, ids.matterBlob, dir) then
+      local fx, fy = GetFullForward(x, y, dir)
+      cells[fy][fx].matter_stored_cell = CopyTable(cells[by][bx])
+      cells[by][bx] = {
+        ctype = 0, rot = 0, lastvars = {x, y, 0}
+      }
+    end
+  end
 end
 
 local function update(id, x, y, dir)
@@ -1342,6 +1425,10 @@ local function update(id, x, y, dir)
     DoPlayer(x, y, dir)
   elseif id == ids.seeker then
     DoSeeker(x, y, dir)
+  elseif id == ids.matterBlob then
+    DoMatterBlob(x, y, dir)
+  elseif id == ids.matterConverter then
+    DoMatterConverter(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1471,7 +1558,7 @@ local function onPlace(id, x, y, rot, original, originalInitial)
     initial[y][x] = originalInitial
     if id ~= original.musical_last_played then
       cells[y][x].musical_last_played = id
-      DoMusicalCell(currentrot + 1)
+      DoMusicalCell((currentrot + cells[y][x].rot) % 4 + 1)
     end
   elseif id == ids.player and econfig['player_lock'] == true then
     for cy=1,height-1 do
