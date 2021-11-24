@@ -1488,6 +1488,22 @@ end
 
 local gridRotation = 0
 
+local function properlyChangeZoom(oldzoom, newzoom)
+  local w2 = 400 * winxm
+  local h2 = 300 * winym
+
+  offx = offx + w2
+  offy = offy + h2
+
+  local scale = (newzoom / oldzoom)
+
+  offx = offx * scale
+  offy = offy * scale
+
+  offx = offx - w2
+  offy = offy - h2
+end
+
 local function onGridRender()
   if not (paused) then
     for x=1,width-1 do
@@ -1497,8 +1513,7 @@ local function onGridRender()
           DoLightbulb(x, y)
         elseif (id == ids.player or (cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0)) and not inmenu then
           if econfig['player_lock'] == true then
-
-            zoom = econfig['player_zoom'] or 100
+            local fov = econfig['player_zoom'] or 100
             local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
         
             local center = {
@@ -1511,12 +1526,16 @@ local function onGridRender()
             spos.y = spos.y - center.y
         
             -- Smooth
-            -- local i = 0.3
-            -- spos.x = spos.x * i
-            -- spos.y = spos.y * i
-        
+            local i = 0.15
+            spos.x = spos.x * i
+            spos.y = spos.y * i
+            fov = (fov - zoom) * i + zoom
+
             offx = lerp(offx, offx + spos.x, itime/delay)
             offy = lerp(offy, offy + spos.y, itime/delay)
+            local oldzoom = zoom
+            zoom = lerp(zoom, fov, itime/delay)
+            properlyChangeZoom(oldzoom, zoom)
           end
         end
       end
@@ -1640,6 +1659,26 @@ local function onMouseReleased()
   end
 end
 
+-- local function onMouseScroll(x, y)
+--   if y < 0 then
+-- 		for i=1,y do
+-- 			if zoom < 160 then
+-- 				zoom = zoom*2
+-- 				offx = offx*2 + 400*winxm
+-- 				offy = offy*2 + 300*winym
+-- 			end
+-- 		end
+-- 	elseif y > 0 then
+-- 		for i=-1,y,-1 do
+-- 			if zoom > 2 then
+-- 				offx = (offx-400*winxm)*0.5
+-- 				offy = (offy-300*winym)*0.5
+-- 				zoom = zoom*0.5
+-- 			end
+-- 		end
+-- 	end
+-- end
+
 return {
   init = init,
   update = update,
@@ -1654,4 +1693,5 @@ return {
   customupdate = customupdate,
   onCellGenerated = onCellGenerated,
   onMouseReleased = onMouseReleased,
+  onMouseScroll = onMouseScroll,
 }
