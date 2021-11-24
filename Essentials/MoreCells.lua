@@ -712,6 +712,49 @@ local function FakeMoveForward(x, y, dir, replacetype, replacerot)
   SetChunk(x+front.x, y+front.y, us.ctype)
 end
 
+local function DoEnemyMover(x, y, dir)
+  local fx, fy = GetFullForward(x, y, dir)
+
+  if not inGrid(fx, fy) then
+    return
+  end
+
+  if canPush(fx, fy, dir) then
+    local front = cells[fy][fx]
+    local id = front.ctype
+    if id ~= 0 then
+      if id == 11 or isModdedTrash(id) then
+        if id ~= 11 then
+          modsOnTrashEat(id, fx, fy, cells[y][x], x, y)
+        end
+      else
+        destroysound:play()
+        enemyparticles:setPosition(fx*20,fy*20)
+        enemyparticles:emit(50)
+        if id == 23 then
+          cells[fy][fx].ctype = 12
+        else
+          cells[fy][fx].ctype = 0
+        end
+        if isModdedBomb(id) then
+          modsOnModEnemyDed(id, fx, fy, cells[y][x], x, y)
+        end
+        cells[y][x] = {
+          ctype = 0,
+          rot = 0,
+          lastvars = {
+            x, y, 0
+          }
+        }
+      end
+    end
+    -- If we haven't exploded, we go
+    if cells[y][x].ctype ~= 0 then
+      FakeMoveForward(x, y, dir)
+    end
+  end
+end
+
 local function DoTrashMover(x, y, dir)
   local frontOff = GetForward(dir)
 
@@ -771,7 +814,7 @@ local function DoPortal(id, x, y, food, fx, fy)
   local fdir = (food.rot + 2) % 4
 
   local closestDist = 1/0
-  local seeker = {x, y}
+  local seeker = {x, y, cells[y][x].rot}
   -- Ah yes, PERFORMANCE
   for sy=1,height-1 do
     for sx=1,width-1 do
@@ -779,7 +822,7 @@ local function DoPortal(id, x, y, food, fx, fy)
         local dist = math.pow(sx - x, 2) + math.pow(sy - y, 2)
         if closestDist > dist then
           closestDist = dist
-          seeker = {sx, sy}
+          seeker = {sx, sy, cells[sy][sx].rot}
         end
       end
     end
@@ -789,7 +832,8 @@ local function DoPortal(id, x, y, food, fx, fy)
   if seeker then
     -- Portal tiem
     local relativeDir = DirFromOff(fx - x, fy - y)
-    local sx, sy = seeker[1], seeker[2]
+    local sx, sy, sdir = seeker[1], seeker[2], seeker[3]
+    --relativeDir = (relativeDir + sdir - cells[y][x].rot) % 4
     if PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir}) then
       if food.is_hidden_player then
         local sfx, sfy = GetFullForward(sx, sy, relativeDir)
@@ -857,6 +901,10 @@ local function DoSeeker(x, y, dir)
   end
 end
 
+local function dontpull(x, y, rot, px, py, prot, ptype)
+  return ptype ~= "pull"
+end
+
 local function init()
   local placeholder = "textures/push.png"
 
@@ -905,8 +953,9 @@ local function init()
   addFlipperTranslation(1, 13)
 
   -- Portals
-  ids.portal_a = addCell("EMC portal-a", texp .. "portals/a.png", Options.combine(Options.trash, Options.neverupdate))
-  ids.portal_b = addCell("EMC portal-b", texp .. "portals/b.png", Options.combine(Options.trash, Options.neverupdate))
+  local portalOptions = {type = "trash", dontupdate = true}
+  ids.portal_a = addCell("EMC portal-a", texp .. "portals/a.png", portalOptions)
+  ids.portal_b = addCell("EMC portal-b", texp .. "portals/b.png", portalOptions)
 
   -- Add useful stuff
   local slideTrash = addCell("EMC slide-trash", texp .. "trash_side.png", {type="sidetrash", dontupdate = true})
@@ -921,6 +970,13 @@ local function init()
     if dir == nil then return false end
     return ((dir+2)%4 == cells[y][x].rot)
   end)
+
+  -- ids.enemyMover = addCell("EMC enemy-mover", texp .. "enemyMove.png", {type = "sideenemy"})
+
+  -- SetSidedEnemy(ids.enemyMover, function(x, y, dir)
+  --   if dir == nil then return false end
+  --   return ((dir+2)%4 == cells[y][x].rot)
+  -- end)
 
   ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash))
 
@@ -970,6 +1026,7 @@ local function init()
     local destCat = Toolbar:GetCategory("Destroyers")
     destCat:AddItem("Enemy Slider", "Acts as an enemy cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideEnemy)
     destCat:AddItem("Trash Slider", "Acts as a trash cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideTrash)
+    destCat:AddItem("Enemy-Mover", "Enemy cell moving on the grid. Complete total meme", ids.enemyMover)
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
     destCat:AddItem("Ghost Trash", "Trash cell that can't be generated", ids.ghostTrash)
@@ -1167,6 +1224,20 @@ local function DoPlayer(x, y, dir, recursive)
         }
       end
     end
+  elseif love.keyboard.isDown('u') then
+    local force = 1
+    local id = cells[y][x].ctype
+    if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
+      force = 0
+    end
+    if type(cellWeights[id]) == "number" then
+      force = force + cellWeights[id]
+    end
+    if id == 21 then
+      force = force + 1
+    end
+    local bx, by = GetFullForward(x, y, dir, -1)
+    PushCell(bx, by, dir, true, force)
   elseif love.keyboard.isDown('k') then
     -- Kopy ability
     local fx, fy = GetFullForward(x, y, dir)
@@ -1221,6 +1292,8 @@ local function update(id, x, y, dir)
     DoStickyPiston(x, y, dir)
   elseif id == ids.trashMover then
     DoTrashMover(x, y, dir)
+  elseif id == ids.enemyMover then
+    DoEnemyMover(x, y, dir)
   elseif id == ids.wire and isMechOn(x, y) then
     cells[y][x].testvar = cells[y][x].mech_signal
   elseif id == ids.gen4 then
@@ -1350,6 +1423,21 @@ local function tick()
   -- until #stickyQueue == 0
 end
 
+local function DoMusicalCell(sound)
+  local sounds = {
+    texp .. "sounds/piano1.wav",
+    texp .. "sounds/piano2.wav",
+    texp .. "sounds/piano3.wav",
+    texp .. "sounds/piano4.wav",
+  }
+  if audiocache[sounds[sound]] then
+    if audiocache[sounds[sound]]:isPlaying() then
+      audiocache[sounds[sound]]:stop()
+    end
+  end
+  playSound(sounds[sound])
+end
+
 local function onPlace(id, x, y, rot, original, originalInitial)
   cells[y][x].mech_signal = 0
   cells[y][x].is_hidden_player = false
@@ -1359,6 +1447,13 @@ local function onPlace(id, x, y, rot, original, originalInitial)
     initial[y][x] = originalInitial
 
     cells[y][x].monitor_torender = id
+  elseif original.ctype == ids.musical and id ~= ids.musical and id ~= 0 then
+    cells[y][x] = original
+    initial[y][x] = originalInitial
+    if id ~= original.musical_last_played then
+      cells[y][x].musical_last_played = id
+      DoMusicalCell(currentrot + 1)
+    end
   elseif id == ids.player and econfig['player_lock'] == true then
     for cy=1,height-1 do
       for cx=1,width-1 do
@@ -1448,18 +1543,7 @@ local function onTrashEats(id, x, y, food, fx, fy)
 
     local dir = (cells[y][x].rot - cdir) % 4
 
-    local sounds = {
-      texp .. "sounds/piano1.wav",
-      texp .. "sounds/piano2.wav",
-      texp .. "sounds/piano3.wav",
-      texp .. "sounds/piano4.wav",
-    }
-    if audiocache[sounds[dir+1]] then
-      if audiocache[sounds[dir+1]]:isPlaying() then
-        audiocache[sounds[dir+1]]:stop()
-      end
-    end
-    playSound(sounds[dir+1])
+    DoMusicalCell(dir+1)
   elseif id == ids.portal_a or id == ids.portal_b then
     DoPortal(id, x, y, food, fx, fy)
   end
@@ -1517,6 +1601,14 @@ local function onCellGenerated(id, x, y)
   end
 end
 
+local function onMouseReleased()
+  for cy=1, height-1 do
+    for cx=1, width-1 do
+      cells[cy][cx].musical_last_played = nil
+    end
+  end
+end
+
 return {
   init = init,
   update = update,
@@ -1530,4 +1622,5 @@ return {
   onGridRender = onGridRender,
   customupdate = customupdate,
   onCellGenerated = onCellGenerated,
+  onMouseReleased = onMouseReleased,
 }
