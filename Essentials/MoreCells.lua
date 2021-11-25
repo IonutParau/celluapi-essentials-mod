@@ -956,6 +956,7 @@ local function init()
   ids.matterBlob = addCell("EMC matter blob", texp .. "matter/blob.png", Options.combine(Options.mover, Options.invisible))
   ids.matterConverter = addCell("EMC matter converter", texp .. "matter/converter.png")
   ids.nuclearBomb = addCell("EMC nuclear bomb", texp .. "nuclear_bomb.png", {type="enemy", dontupdate = true})
+  ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1}))
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1040,6 +1041,7 @@ local function init()
     destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
     destCat:AddItem("Ghost Trash", "Trash cell that can't be generated", ids.ghostTrash)
     destCat:AddItem("Nuclear Bomb", "One of, if not THE most powerful bomb in modded CelLua history", ids.nuclearBomb)
+    destCat:AddItem("Black hole", "Nobody knows what's inside.", ids.blackhole)
 
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
@@ -1451,6 +1453,23 @@ local function DoNuclearBomb(x, y, range)
   end
 end
 
+local function DoBlackhole(x, y)
+  local range = 3
+  for oy=-range, range do
+    for ox=-range, range do
+      if math.sqrt(ox * ox + oy * oy) <= range and not (ox == 0 and oy == 0) then
+        local cx, cy = math.floor(x + ox), math.floor(y + oy)
+
+        cells[cy][cx] = {
+          ctype = 0,
+          rot = 0,
+          lastvars = {cx, cy, 0}
+        }
+      end
+    end
+  end
+end
+
 local function update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
@@ -1513,6 +1532,8 @@ local function update(id, x, y, dir)
     DoMatterBlob(x, y, dir)
   elseif id == ids.matterConverter then
     DoMatterConverter(x, y, dir)
+  elseif id == ids.blackhole then
+    DoBlackhole(x, y)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1706,6 +1727,14 @@ local function onGridRender()
           love.graphics.setColor(0, 0.2, 0, 0.3)
           local spos = calculateScreenPosition(x, y)
           love.graphics.circle("fill", spos.x, spos.y, zoom*3)
+          love.graphics.setColor(r, g, b, a)
+        end
+        if id == ids.blackhole then
+          local spos = calculateScreenPosition(x, y)
+
+          local r, g, b, a = love.graphics.getColor()
+          love.graphics.setColor(0, 0, 0, 1)
+          love.graphics.circle("fill", spos.x, spos.y, 3.3 * zoom)
           love.graphics.setColor(r, g, b, a)
         end
         if cells[y][x].ctype == ids.lightBulb or id == ids.brightLightBulb or id == ids.brighterLightBulb or id == ids.brightestLightBulb then
