@@ -957,6 +957,7 @@ local function init()
   ids.matterConverter = addCell("EMC matter converter", texp .. "matter/converter.png")
   ids.nuclearBomb = addCell("EMC nuclear bomb", texp .. "nuclear_bomb.png", {type="enemy", dontupdate = true})
   ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1}))
+  ids.superimpulser = addCell("EMC super-impulser", texp .. "superimpulser.png")
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1044,6 +1045,7 @@ local function init()
     destCat:AddItem("Black hole", "Nobody knows what's inside.", ids.blackhole)
 
     local movCat = Toolbar:GetCategory("Movers")
+    movCat:AddItem("Super Impulser", "Impulser up to 11", ids.superimpulser)
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
     
@@ -1470,6 +1472,54 @@ local function DoBlackhole(x, y)
   end
 end
 
+local function DoSuperImpulserSide(x, y, dir)
+  local ox, oy, odir = x, y, dir
+
+  local cx, cy = GetFullForward(x, y, dir)
+  local px, py = ox, oy
+  -- What are we impulsing?
+  while true do
+    if inGrid(cx, cy) and cells[cy][cx].ctype ~= 0 then
+      break
+    end
+    if inGrid(cx, cy) then
+      local w = walkDivergedPath(px, py, cx, cy)
+      px = cx
+      py = cy
+    
+      cx = w.x
+      cy = w.y
+      dir = w.dir
+      cx, cy = GetFullForward(cx, cy, dir)
+    else
+      break
+    end
+  end
+
+  -- Pulling time
+  dir = (dir+2)%4
+  local reps = 0
+  while true do
+    if reps == 999999 then break end
+    if cx == ox and cy == oy then break end
+    local fx, fy = GetFullForward(cx, cy, dir)
+
+    PullCell(cx, cy, dir, false, 1)
+    
+    local w = walkDivergedPath(cx, cy, fx, fy)
+    cx = w.x
+    cy = w.y
+    dir = w.dir
+    reps = reps + 1
+  end
+end
+
+local function DoSuperImpulser(x, y)
+  for dir=0,3 do
+    DoSuperImpulserSide(x, y, dir)
+  end
+end
+
 local function update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
@@ -1534,6 +1584,8 @@ local function update(id, x, y, dir)
     DoMatterConverter(x, y, dir)
   elseif id == ids.blackhole then
     DoBlackhole(x, y)
+  elseif id == ids.superimpulser then
+    DoSuperImpulser(x, y)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1718,6 +1770,19 @@ local function properlyChangeZoom(oldzoom, newzoom)
 end
 
 local function onGridRender()
+  for x=1,width-1 do
+    for y=1,height-1 do
+      local id = cells[y][x].ctype
+      if id == ids.blackhole then
+        local spos = calculateScreenPosition(x, y)
+
+        local r, g, b, a = love.graphics.getColor()
+        love.graphics.setColor(0, 0, 0, 1)
+        love.graphics.circle("fill", spos.x, spos.y, 3.3 * zoom)
+        love.graphics.setColor(r, g, b, a)
+      end
+    end
+  end
   if not (paused) then
     for x=1,width-1 do
       for y=1,height-1 do
@@ -1727,14 +1792,6 @@ local function onGridRender()
           love.graphics.setColor(0, 0.2, 0, 0.3)
           local spos = calculateScreenPosition(x, y)
           love.graphics.circle("fill", spos.x, spos.y, zoom*3)
-          love.graphics.setColor(r, g, b, a)
-        end
-        if id == ids.blackhole then
-          local spos = calculateScreenPosition(x, y)
-
-          local r, g, b, a = love.graphics.getColor()
-          love.graphics.setColor(0, 0, 0, 1)
-          love.graphics.circle("fill", spos.x, spos.y, 3.3 * zoom)
           love.graphics.setColor(r, g, b, a)
         end
         if cells[y][x].ctype == ids.lightBulb or id == ids.brightLightBulb or id == ids.brighterLightBulb or id == ids.brightestLightBulb then
