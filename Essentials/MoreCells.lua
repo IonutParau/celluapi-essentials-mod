@@ -954,6 +954,7 @@ local function init()
   ids.seeker = addCell("EMC seeker", texp .. "seeker.png", {type="mover"})
   ids.matterBlob = addCell("EMC matter blob", texp .. "matter/blob.png", Options.combine(Options.mover, Options.invisible))
   ids.matterConverter = addCell("EMC matter converter", texp .. "matter/converter.png")
+  ids.nuclearBomb = addCell("EMC nuclear bomb", texp .. "nuclear_bomb.png", {type="enemy", dontupdate = true})
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1037,6 +1038,7 @@ local function init()
     destCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     destCat:AddItem("Silent Trash", "Trash cell that plays no sound", ids.silentTrash)
     destCat:AddItem("Ghost Trash", "Trash cell that can't be generated", ids.ghostTrash)
+    destCat:AddItem("Nuclear Bomb", "One of, if not THE most powerful bomb in modded CelLua history", ids.nuclearBomb)
 
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
@@ -1515,10 +1517,33 @@ local function onCellDraw(id, x, y, rot)
   end
 end
 
+local lights = {}
+
 local function tick()
   playerPosCache = nil
   for y=1,height-1 do
     for x=1,width-1 do
+      if cells[y][x].radioactive then
+        for oy=-3,3 do
+          for ox=-3,3 do
+            if math.sqrt(ox * ox + oy * oy) <= 3 then
+              local cx, cy = x + ox, y + oy
+              if inGrid(cx, cy) then
+                cells[cy][cx].radiation = (cells[cy][cx].radiation or 0) + 1
+              end
+            end
+          end
+        end
+        cells[y][x].radiation = (cells[y][x].radiation or 0) + 0.1
+      end
+      if (cells[y][x].radiation or 0) > 75 then
+        cells[y][x] = {
+          ctype = 0, rot = 0, lastvars = {x, y, 0}
+        }
+      end
+      if cells[y][x].radioactive and cells[y][x].ctype == 0 then
+        cells[y][x].radioactive = false
+      end
       if cells[y][x].player_hidden_type then
         cells[y][x].ctype = cells[y][x].player_hidden_type
         cells[y][x].player_hidden_type = nil
@@ -1592,10 +1617,39 @@ local function properlyChangeZoom(oldzoom, newzoom)
 end
 
 local function onGridRender()
+  local lightsRemoval = {}
+  for index, light in ipairs(lights) do
+    if light.lifetime <= 0 then
+      table.insert(lightsRemoval, index)
+    end
+    local r, g, b, a = love.graphics.getColor()
+    
+    local radius = light.radius * (light.lifetime / light.lifespan)
+    local spos = calculateScreenPosition(light.x, light.y)
+    love.graphics.setColor(1, 1, 1, 0.05)
+    for rad=1,radius, 0.2 do
+      local vrad = zoom * rad
+      if spos.x > -vrad or spos.y > -vrad or spos.x < love.graphics.getWidth()-vrad or spos.y < love.graphics.getHeight()-vrad then
+        love.graphics.circle("fill", spos.x, spos.y, zoom * rad)
+      end
+    end
+
+    love.graphics.setColor(r, g, b, a)
+  end
+  for _, i in ipairs(lightsRemoval) do
+    table.remove(lights, i)
+  end
   if not (paused) then
     for x=1,width-1 do
       for y=1,height-1 do
         local id = cells[y][x].ctype
+        if cells[y][x].radioactive then
+          local r, g, b, a = love.graphics.getColor()
+          love.graphics.setColor(0, 0.2, 0, 0.3)
+          local spos = calculateScreenPosition(x, y)
+          love.graphics.circle("fill", spos.x, spos.y, zoom*3)
+          love.graphics.setColor(r, g, b, a)
+        end
         if cells[y][x].ctype == ids.lightBulb or id == ids.brightLightBulb or id == ids.brighterLightBulb or id == ids.brightestLightBulb then
           DoLightbulb(x, y)
         elseif (id == ids.player or (cells[y][x].is_hidden_player and cells[y][x].ctype ~= 0)) and not inmenu then
@@ -1674,8 +1728,89 @@ local function onTrashEats(id, x, y, food, fx, fy)
   end
 end
 
+local function DoNuclearBomb(x, y, range)
+  local us = CopyTable(cells[y][x])
+  cells[y][x].ctype = 0
+  range = range or 200
+
+  table.insert(lights, {
+    lifetime = 10,
+    lifespan = 10,
+    x = x,
+    y = y,
+    radius = range
+  })
+
+  for oy=-range, range, 1 do
+    for ox=-range, range, 1 do
+      local dist = math.sqrt(ox * ox + oy * oy)
+
+      if dist <= range then
+        local cx = x + ox
+        local cy = y + oy
+        if inGrid(cx, cy) then
+          if dist <= range/5 then
+            -- Instant death zone
+            local bombID = cells[cy][cx].ctype
+            cells[cy][cx] = {
+              ctype = 0,
+              rot = 0,
+              lastvars = {cx, cy, 0}
+            }
+            if bombID == 23 then
+              cells[cy][cx].ctype = 12
+            elseif isModdedBomb(bombID) then
+              modsOnModEnemyDed(bombID, cx, cy, us, x, y)
+            elseif bombID == 50 then
+              for dir=0,3 do
+                local ocx, ocy = GetFullForward(cx, cy, dir)
+                if inGrid(ocx, ocy) then
+                  cells[ocy][ocx] = {
+                    ctype = 0,
+                    rot = 0,
+                    lastvars = {ocx, ocy, 0}
+                  }
+                end
+              end
+            elseif isModdedTrash(bombID) then
+              modsOnTrashEat(bombID, cx, cy, us, x, y)
+            end
+          elseif dist <= range/2 then
+            -- Radioactivity zone
+            if cells[cy][cx].ctype == 12 or cells[cy][cx].ctype == 23 or isModdedBomb(cells[cy][cx].ctype) then
+              destroysound:play()
+              enemyparticles:setPosition(cx * 20, cy * 20)
+              enemyparticles:emit(50)
+              if cells[cy][cx].ctype == 23 then
+                cells[cy][cx].ctype = 12
+                cells[cy][cx].radioactive = true
+              else
+                local bombID = cells[cy][cx].ctype
+                cells[cy][cx].ctype = 0
+                if bombID > initialCellCount then
+                  modsOnModEnemyDed(bombID, cx, cy, us, x, y)
+                end
+              end
+            elseif cells[cy][cx].ctype ~= 0 then
+              cells[cy][cx].radioactive = true
+            end
+          elseif dist <= range then
+            -- Radiation damage
+            if cells[cy][cx].ctype ~= 0 then
+              cells[cy][cx].radiation = (cells[cy][cx].radiation or 0) + 50
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 local function onEnemyDies(id, x, y, killer, kx, ky)
   DoDeathGen(x, y)
+  if id == ids.nuclearBomb then
+    DoNuclearBomb(x, y)
+  end
 end
 
 -- local function onMove(id, x, y, rot)
@@ -1689,6 +1824,11 @@ local playTime = 0
 local loadedPlayerFix = false
 
 local function customupdate(dt)
+  if not (paused or inmenu) then
+    for _, light in ipairs(lights) do
+      light.lifetime = light.lifetime - dt / (math.max(delay, 1 / light.lifespan))
+    end
+  end
   if not loadedPlayerFix then
     loadedPlayerFix = true
     table.insert(subticks, 1, fixPlayerHidedness)

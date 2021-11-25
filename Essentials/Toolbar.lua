@@ -397,11 +397,11 @@ local function defend()
 
   if w == 0 and h == 0 and x < 2 and y < 2 then return end
 
-  selx = math.max(x - 2, 1)
-  sely = math.max(y - 2, 1)
+  selx = math.max(x - 2, 2)
+  sely = math.max(y - 2, 2)
 
-  selw = math.min(w + 4, width-5)
-  selh = math.min(h + 4, height-5)
+  selw = math.min(w + 4, width-6)
+  selh = math.min(h + 4, height-6)
 
   -- Layer 1 of trash
   if inGrid(x+w, y+h) and empty(x+w, y+h) then
