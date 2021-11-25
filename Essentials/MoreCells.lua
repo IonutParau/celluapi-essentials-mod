@@ -1371,6 +1371,86 @@ local function DoMatterConverter(x, y, dir)
   end
 end
 
+local lights = {}
+
+local function DoNuclearBomb(x, y, range)
+  local us = CopyTable(cells[y][x])
+  cells[y][x].ctype = 0
+  range = range or 200
+
+  table.insert(lights, {
+    lifetime = 10,
+    lifespan = 10,
+    x = x,
+    y = y,
+    radius = range*1.2
+  })
+
+  for oy=-range, range, 1 do
+    for ox=-range, range, 1 do
+      local dist = math.sqrt(ox * ox + oy * oy)
+
+      if dist <= range then
+        local cx = x + ox
+        local cy = y + oy
+        if inGrid(cx, cy) then
+          if dist <= range/5 then
+            -- Instant death zone
+            local bombID = cells[cy][cx].ctype
+            cells[cy][cx] = {
+              ctype = 0,
+              rot = 0,
+              lastvars = {cx, cy, 0}
+            }
+            if bombID == 23 then
+              cells[cy][cx].ctype = 12
+            elseif isModdedBomb(bombID) then
+              modsOnModEnemyDed(bombID, cx, cy, us, x, y)
+            elseif bombID == 50 then
+              for dir=0,3 do
+                local ocx, ocy = GetFullForward(cx, cy, dir)
+                if inGrid(ocx, ocy) then
+                  cells[ocy][ocx] = {
+                    ctype = 0,
+                    rot = 0,
+                    lastvars = {ocx, ocy, 0}
+                  }
+                end
+              end
+            elseif isModdedTrash(bombID) then
+              modsOnTrashEat(bombID, cx, cy, us, x, y)
+            end
+          elseif dist <= range/2 then
+            -- Radioactivity zone
+            if cells[cy][cx].ctype == 12 or cells[cy][cx].ctype == 23 or isModdedBomb(cells[cy][cx].ctype) then
+              destroysound:play()
+              enemyparticles:setPosition(cx * 20, cy * 20)
+              enemyparticles:emit(50)
+              if cells[cy][cx].ctype == 23 then
+                cells[cy][cx].ctype = 12
+                cells[cy][cx].radioactive = true
+              else
+                local bombID = cells[cy][cx].ctype
+                cells[cy][cx].ctype = 0
+                if bombID > initialCellCount then
+                  modsOnModEnemyDed(bombID, cx, cy, us, x, y)
+                end
+              end
+            elseif cells[cy][cx].ctype ~= 0 then
+              cells[cy][cx].radioactive = true
+            end
+          elseif dist <= range then
+            -- Radiation damage
+            if cells[cy][cx].ctype ~= 0 then
+              cells[cy][cx].radiation = (cells[cy][cx].radiation or 0) + 50
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 local function update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
@@ -1378,6 +1458,8 @@ local function update(id, x, y, dir)
     cells[y][x].monitor_torender = nil
   elseif id == ids.musical then
     DoMusicalCell(dir+1)
+  elseif id == ids.nuclearBomb then
+    DoNuclearBomb(x, y)
   end
 
   -- Actual updates
@@ -1516,8 +1598,6 @@ local function onCellDraw(id, x, y, rot)
     end
   end
 end
-
-local lights = {}
 
 local function tick()
   playerPosCache = nil
@@ -1725,84 +1805,6 @@ local function onTrashEats(id, x, y, food, fx, fy)
     DoMusicalCell(dir+1)
   elseif id == ids.portal_a or id == ids.portal_b then
     DoPortal(id, x, y, food, fx, fy)
-  end
-end
-
-local function DoNuclearBomb(x, y, range)
-  local us = CopyTable(cells[y][x])
-  cells[y][x].ctype = 0
-  range = range or 200
-
-  table.insert(lights, {
-    lifetime = 10,
-    lifespan = 10,
-    x = x,
-    y = y,
-    radius = range*1.2
-  })
-
-  for oy=-range, range, 1 do
-    for ox=-range, range, 1 do
-      local dist = math.sqrt(ox * ox + oy * oy)
-
-      if dist <= range then
-        local cx = x + ox
-        local cy = y + oy
-        if inGrid(cx, cy) then
-          if dist <= range/5 then
-            -- Instant death zone
-            local bombID = cells[cy][cx].ctype
-            cells[cy][cx] = {
-              ctype = 0,
-              rot = 0,
-              lastvars = {cx, cy, 0}
-            }
-            if bombID == 23 then
-              cells[cy][cx].ctype = 12
-            elseif isModdedBomb(bombID) then
-              modsOnModEnemyDed(bombID, cx, cy, us, x, y)
-            elseif bombID == 50 then
-              for dir=0,3 do
-                local ocx, ocy = GetFullForward(cx, cy, dir)
-                if inGrid(ocx, ocy) then
-                  cells[ocy][ocx] = {
-                    ctype = 0,
-                    rot = 0,
-                    lastvars = {ocx, ocy, 0}
-                  }
-                end
-              end
-            elseif isModdedTrash(bombID) then
-              modsOnTrashEat(bombID, cx, cy, us, x, y)
-            end
-          elseif dist <= range/2 then
-            -- Radioactivity zone
-            if cells[cy][cx].ctype == 12 or cells[cy][cx].ctype == 23 or isModdedBomb(cells[cy][cx].ctype) then
-              destroysound:play()
-              enemyparticles:setPosition(cx * 20, cy * 20)
-              enemyparticles:emit(50)
-              if cells[cy][cx].ctype == 23 then
-                cells[cy][cx].ctype = 12
-                cells[cy][cx].radioactive = true
-              else
-                local bombID = cells[cy][cx].ctype
-                cells[cy][cx].ctype = 0
-                if bombID > initialCellCount then
-                  modsOnModEnemyDed(bombID, cx, cy, us, x, y)
-                end
-              end
-            elseif cells[cy][cx].ctype ~= 0 then
-              cells[cy][cx].radioactive = true
-            end
-          elseif dist <= range then
-            -- Radiation damage
-            if cells[cy][cx].ctype ~= 0 then
-              cells[cy][cx].radiation = (cells[cy][cx].radiation or 0) + 50
-            end
-          end
-        end
-      end
-    end
   end
 end
 
