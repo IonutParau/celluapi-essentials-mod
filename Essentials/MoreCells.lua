@@ -834,7 +834,8 @@ local function DoPortal(id, x, y, food, fx, fy)
     -- Portal tiem
     local relativeDir = (DirFromOff(fx - x, fy - y)+2)%4
     local sx, sy, sdir = seeker[1], seeker[2], seeker[3]
-    --relativeDir = (relativeDir + sdir - cells[y][x].rot) % 4
+    fdir = (fdir + sdir - cells[y][x].rot) % 4
+    relativeDir = (relativeDir + sdir - cells[y][x].rot) % 4
     if PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir}) then
       if food.is_hidden_player then
         local sfx, sfy = GetFullForward(sx, sy, relativeDir)
@@ -1222,17 +1223,17 @@ local function DoPlayer(x, y, dir, recursive)
   if love.keyboard.isDown('up') and not recursive then
     if love.keyboard.isDown('lshift') then
       local id = cells[y][x].ctype
-      if id == 11 or id == 12 or id == 23 or id == 50 or isModdedBomb(id) or isModdedTrash(id) then
+      if id == 11 or id == 12 or id == 23 or id == 50 or isModdedBomb(id) or isModdedTrash(id) or GetSidedTrash(id) ~= nil or GetSidedEnemy(id) ~= nil then
         local fx, fy = GetFullForward(x, y, dir)
         local fid = cells[fy][fx].ctype
-        if (fid == 0) or (fid ~= 11 and fid ~= 12 and fid ~= 23 and fid ~= 50 and (not isModdedBomb(fid)) and (not isModdedTrash(fid))) then
+        if (fid == 0) or (fid ~= 11 and fid ~= 12 and fid ~= 23 and fid ~= 50 and (not isModdedBomb(fid)) and (not isModdedTrash(fid))) and (not (GetSidedTrash(fid) ~= nil and GetSidedTrash(fid)(fx, fy, dir) == true)) and (not (GetSidedEnemy(fid) ~= nil and GetSidedEnemy(fid)(fx, fy, dir) == true)) then
           if PushCell(x, y, dir, true, 1) then
             FakeMoveForward(x, y, dir)
           end
         else
-          if fid == 1 or fid == 50 or isModdedTrash(fid) then
+          if fid == 11 or fid == 50 or isModdedTrash(fid) or (GetSidedTrash(fid) ~= nil) then
             cells[y][x].is_hidden_player = true
-            if isModdedTrash(fid) then
+            if isModdedTrash(fid) or (GetSidedTrash(fid) ~= nil) then
               modsOnTrashEat(fid, fx, fy, cells[y][x], x, y)
             elseif fid == 50 then
               for odir=0,3 do
@@ -1253,7 +1254,7 @@ local function DoPlayer(x, y, dir, recursive)
               cells[fy][fx].ctype = 0
             elseif fid == 23 then
               cells[fy][fx].ctype = 12
-            elseif isModdedBomb(fid) then
+            elseif fid > initialCellCount then
               cells[fy][fx].ctype = 0
               modsOnModEnemyDed(fid, fx, fy, cells[y][x], x, y)
             end
@@ -1617,28 +1618,6 @@ local function properlyChangeZoom(oldzoom, newzoom)
 end
 
 local function onGridRender()
-  local lightsRemoval = {}
-  for index, light in ipairs(lights) do
-    if light.lifetime <= 0 then
-      table.insert(lightsRemoval, index)
-    end
-    local r, g, b, a = love.graphics.getColor()
-    
-    local radius = light.radius * (light.lifetime / light.lifespan)
-    local spos = calculateScreenPosition(light.x, light.y)
-    love.graphics.setColor(1, 1, 1, 0.05)
-    for rad=1,radius, 0.2 do
-      local vrad = zoom * rad
-      if spos.x > -vrad or spos.y > -vrad or spos.x < love.graphics.getWidth()-vrad or spos.y < love.graphics.getHeight()-vrad then
-        love.graphics.circle("fill", spos.x, spos.y, zoom * rad)
-      end
-    end
-
-    love.graphics.setColor(r, g, b, a)
-  end
-  for _, i in ipairs(lightsRemoval) do
-    table.remove(lights, i)
-  end
   if not (paused) then
     for x=1,width-1 do
       for y=1,height-1 do
@@ -1681,6 +1660,28 @@ local function onGridRender()
         end
       end
     end
+  end
+  local lightsRemoval = {}
+  for index, light in ipairs(lights) do
+    if light.lifetime <= 0 then
+      table.insert(lightsRemoval, index)
+    end
+    local r, g, b, a = love.graphics.getColor()
+    
+    local radius = light.radius * (light.lifetime / light.lifespan)
+    local spos = calculateScreenPosition(light.x, light.y)
+    love.graphics.setColor(1, 1, 1, 0.05)
+    for rad=1,radius, 0.2 do
+      local vrad = zoom * rad
+      if spos.x > -vrad or spos.y > -vrad or spos.x < love.graphics.getWidth()-vrad or spos.y < love.graphics.getHeight()-vrad then
+        love.graphics.circle("fill", spos.x, spos.y, zoom * rad)
+      end
+    end
+
+    love.graphics.setColor(r, g, b, a)
+  end
+  for _, i in ipairs(lightsRemoval) do
+    table.remove(lights, i)
   end
 end
 
@@ -1738,7 +1739,7 @@ local function DoNuclearBomb(x, y, range)
     lifespan = 10,
     x = x,
     y = y,
-    radius = range
+    radius = range*5
   })
 
   for oy=-range, range, 1 do
