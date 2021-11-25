@@ -1213,8 +1213,7 @@ local function DoFan(x, y, dir)
     fy = f.y
 
     local front = CopyTable(cells[fy][fx])
-
-    if PushCell(px, py, dir, true, 1) and front.ctype ~= 0 then return end
+    if not PushCell(px, py, dir, true, 1) then return end
   end
 end
 
@@ -1827,7 +1826,7 @@ local loadedPlayerFix = false
 local function customupdate(dt)
   if not (paused or inmenu) then
     for _, light in ipairs(lights) do
-      light.lifetime = light.lifetime - dt / (math.max(delay, 1 / light.lifespan))
+      light.lifetime = light.lifetime - (dt / (math.max(delay, 1 / light.lifespan))) * tpu
     end
   end
   if not loadedPlayerFix then
