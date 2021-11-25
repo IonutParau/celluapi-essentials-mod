@@ -1739,7 +1739,7 @@ local function DoNuclearBomb(x, y, range)
     lifespan = 10,
     x = x,
     y = y,
-    radius = range*5
+    radius = range*1.2
   })
 
   for oy=-range, range, 1 do
