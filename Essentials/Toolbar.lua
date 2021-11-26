@@ -711,15 +711,15 @@ procCat:AddItem("NAND gate", "Performs NAND operation on it's data. Operation is
 procCat:AddItem("XNOR gate", "Performs XNOR operation on it's data. Operation is true when either no input or both inputs are detected", 36)
 
 local forkCat = Toolbar:AddCategory("Forkers", "When a cell gets moved to their back, they replicate it", "textures/tripleforker.png")
-forkCat:AddItem("Forker", "A forker that replicates to its sides", 47)
-forkCat:AddItem("Triple Forker", "A forker that replicates forward and to its sides", 48)
+forkCat:AddItem("Forker", "Replicates to its sides", 47)
+forkCat:AddItem("Triple Forker", "Replicates forward and to its sides", 48)
 
 local uniqueCat = Toolbar:AddCategory("Unique cells", "Cells that don't fit any other category", "textures/freezer.png")
 uniqueCat:AddItem("Mold", "When generated it destroys itself. Acts as a push cell otherwise", 19)
 uniqueCat:AddItem("Freezer", "Freezes all cells touching it. Frozen cells don't do anything", 24)
-uniqueCat:AddItem("Bias", "Messes with the movers biases", 41)
+uniqueCat:AddItem("Bias", "Messes with the movers biases. Adds 1 movement bias to the side it's moving with", 41)
 uniqueCat:AddItem("Shield", "Prevents surrounding cells from killing enemies", 42)
-uniqueCat:AddItem("Intaker", "Destroyes the cell in front of it, pulling others closer", 43)
+uniqueCat:AddItem("Intaker", "Destroys the cell in front of it, pulling others closer", 43)
 uniqueCat:AddItem("Fungal", "Turns every cell pushing it into Fungal cells", 46)
 uniqueCat:AddItem("Flipper", "Flips cells. Some cells behave differently when flipped", 29)
 
