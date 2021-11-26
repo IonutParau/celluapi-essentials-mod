@@ -1278,7 +1278,7 @@ local function DoPlayer(x, y, dir, recursive)
               destroysound:play()
             end
             cells[y][x].ctype = 0
-          elseif fid == 12 or fid == 23 or isModdedBomb(fid) then
+          elseif fid == 12 or fid == 23 or isModdedBomb(fid) or (GetSidedEnemy(fid) ~= nil) then
             if fid == 12 then
               cells[fy][fx].ctype = 0
             elseif fid == 23 then
