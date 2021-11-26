@@ -911,6 +911,17 @@ local function dontpull(x, y, rot, px, py, prot, ptype)
   return ptype ~= "pull"
 end
 
+local function dontpullSide(x, y, rot, px, py, prot, ptype)
+  local dx, dy = px - x, py - y
+  local dir = DirFromOff(dx, dy)
+
+  if dir % 2 ~= rot % 2 then
+    return true
+  else
+    return ptype ~= "pull"
+  end
+end
+
 local function init()
   local placeholder = "textures/push.png"
 
@@ -944,6 +955,12 @@ local function init()
   table.insert(subticks, 1, GenerateSubtick(ids.activator, DoActivator, true))
   giveSubtick(ids.piston, DoModded)
   giveSubtick(ids.stickyPiston, DoModded)
+
+  local nopullID = addCell("EMC no-pull", texp .. "push/nopull.png", {dontupdate=true, push = dontpull})
+  local nopullsideID = addCell("EMC no-pull-side", texp .. "push/nopullside.png", {dontupdate=true, push = dontpullSide})
+  ids.crossintaker = addCell("EMC cross-intaker", texp .. "exotic/intakross.png")
+  ids.strongerenemy = addCell("EMC stronger-enemy", texp .. "enemies/stronger_enemy.png", {type="enemy",dontupdate=true})
+  ids.cross_supgen = addCell("EMC cross-supgen", texp .. "generators/cross_supgen.png")
 
   ids.fan = addCell("EMC fan", texp .. "fans/fan.png")
   ids.strongfan = addCell("EMC strong-fan", texp .. "fans/strongfan.png")
@@ -1035,6 +1052,7 @@ local function init()
     mechGateCat:AddItem("NOT", "Performs NOT operation. Input on back", ids.g_not)
 
     local destCat = Toolbar:GetCategory("Destroyers")
+    destCat:AddItem("Stronger Enemy", "When it dies it turns into a strong enemy. Basically a enemy with 3 hp", ids.strongerenemy)
     destCat:AddItem("Enemy Slider", "Acts as an enemy cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideEnemy)
     destCat:AddItem("Trash Slider", "Acts as a trash cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideTrash)
     destCat:AddItem("Enemy-Mover", "Enemy cell moving on the grid. Complete total meme", ids.enemyMover)
@@ -1066,6 +1084,7 @@ local function init()
     forkerCat:AddItem("Forward-Left Forker", "Name says it all", ids.forward_left_forker)
 
     local uniqueCat = Toolbar:GetCategory("Unique cells")
+    uniqueCat:AddItem("Cross Intaker", "Acts like 2 intakers stacked on top of eachother facing perpendicular directions", ids.crossintaker)
     uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595\nWhen placing a cell on a monitor, the monitor will display that cell", ids.monitor)
     uniqueCat:AddItem("The Musical Cell", "\"At last, it has come.\" \nIs a trash cell but plays a special sound based off of where the cell came from.", ids.musical)
     uniqueCat:AddItem("Player Cell", "Cell that can be controlled by the I, J and L keys. You can even control multiple at once!", ids.player)
@@ -1074,6 +1093,13 @@ local function init()
     uniqueCat:AddItem("Portal B", "When something falls in, it gets sent to the nearest portal A", ids.portal_b)
     uniqueCat:AddItem("Matter Converter", "Converts the cell behind it to a matter blob", ids.matterConverter)
     --uniqueCat:AddItem("Matter Blob", "", ids.matterBlob)
+
+    local pushCat = Toolbar:GetCategory("Pushes")
+    pushCat:AddItem("Unpullable", "It can only be moved. Never pulled", nopullID)
+    pushCat:AddItem("Unpullable on sides", "Like a flipped slide cell that only applies to pullers", nopullsideID)
+
+    local genCat = Toolbar:GetCategory("Generators")
+    genCat:AddItem("Cross Super Generator", "Acts like 2 super generators stacked on top of eachother facing perpendicular directions", ids.cross_supgen)
   end
 end
 
@@ -1520,6 +1546,15 @@ local function DoSuperImpulser(x, y)
   end
 end
 
+local function DoFakeIntaker(x, y, dir)
+  local fx, fy = GetFullForward(x, y, dir)
+  if cells[fy][fx].ctype == 0 then return end
+  cells[fy][fx].ctype = 0
+  destroysound:play()
+  local ffx, ffy = GetFullForward(fx, fy, dir)
+  PullCell(ffx, ffy, (dir+2)%4, false, 1)
+end
+
 local function update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
@@ -1586,6 +1621,12 @@ local function update(id, x, y, dir)
     DoBlackhole(x, y)
   elseif id == ids.superimpulser then
     DoSuperImpulser(x, y)
+  elseif id == ids.crossintaker then
+    DoFakeIntaker(x, y, dir)
+    DoFakeIntaker(x, y, (dir-1)%4)
+  elseif id == ids.cross_supgen then
+    DoSuperGenerator(x, y, dir)
+    DoSuperGenerator(x, y, (dir-1)%4)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1898,6 +1939,8 @@ local function onEnemyDies(id, x, y, killer, kx, ky)
   DoDeathGen(x, y)
   if id == ids.nuclearBomb then
     DoNuclearBomb(x, y)
+  elseif id == ids.strongerenemy then
+    cells[y][x].ctype = 23
   end
 end
 
