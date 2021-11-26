@@ -940,7 +940,8 @@ local function init()
   ids.brighterLightBulb = addCell("EMC mech light-bulb-brighter", texp .. "lightbulbs/brighter.png", Options.static)
   ids.brightestLightBulb = addCell("EMC mech light-bulb-brightest", texp .. "lightbulbs/brightest.png", Options.static)
   ids.slideopener = addCell("EMC mech slideopener", texp .. "slideopener.png", Options.mover)
-  ids.crosswire = addCell("EMC mech crosswire", texp .. "wire/cross/cross1.png", Options.neverupdate)
+  ids.switch = addCell("EMC mech flip-flop", texp .. "mech/tflipflop.png")
+  ids.clockgen_mech = addCell("EMC mech crosswire", texp .. "mech/clockgen.png")
 
   -- Add gates
   ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
@@ -1071,7 +1072,7 @@ local function init()
     fanCat:AddItem("Fan", "Only pushes cells directly in front of it", ids.fan)
     fanCat:AddItem("Super Fan", "Has a range of 2 cell units", ids.strongfan)
     fanCat:AddItem("Hyper Fan", "Has a range of 4 cell units", ids.hyperfan)
-
+    
     movCat:AddItem("Conveyor Cell", "Pushes the cells on its sides forward", ids.conveyor)
     movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
 

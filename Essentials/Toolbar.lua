@@ -90,9 +90,9 @@ function ToolbarSystem.Item()
 end
 
 local function FixItems(self)
-  if #(self.items) % 16 == 0 and #(self.items) >= 16 and self ~= Toolbar then
-    self:AddItem("Back", "Takes you back", backp)
-  end
+  -- if #(self.items) % 16 == 0 and #(self.items) >= 16 and self ~= Toolbar then
+  --   self:AddItem("Back", "Takes you back", backp)
+  -- end
 end
 
 --- @param self ToolbarSystem.Category
