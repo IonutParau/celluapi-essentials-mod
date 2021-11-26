@@ -929,6 +929,17 @@ local function dontpullSide(x, y, rot, px, py, prot, ptype)
   end
 end
 
+local function dontpullSide2(x, y, rot, px, py, prot, ptype)
+  local dx, dy = px - x, py - y
+  local dir = DirFromOff(dx, dy)
+
+  if dir % 2 ~= rot % 2 then
+    return true
+  else
+    return ptype ~= "pull"
+  end
+end
+
 local function onlypull(x, y, rot, px, py, prot, ptype)
   return ptype == "pull"
 end
@@ -939,6 +950,17 @@ local function onlypullSide(x, y, rot, px, py, prot, ptype)
 
   if dir % 2 ~= rot % 2 then
     return false
+  else
+    return ptype == "pull"
+  end
+end
+
+local function onlypullSide2(x, y, rot, px, py, prot, ptype)
+  local dx, dy = px - x, py - y
+  local dir = DirFromOff(dx, dy)
+
+  if dir % 2 ~= rot % 2 then
+    return true
   else
     return ptype == "pull"
   end
@@ -984,8 +1006,10 @@ local function init()
 
   local nopullID = addCell("EMC no-pull", texp .. "push/nopull.png", {dontupdate=true, push = dontpull})
   local nopullsideID = addCell("EMC no-pull-side", texp .. "push/nopullside.png", {dontupdate=true, push = dontpullSide})
+  local nopullsidewithbarID = addCell("EMC no-pull-side-bar", texp .. "push/nopullsidewithbar.png", {dontupdate=true, push = dontpullSide2})
   local pullID = addCell("EMC pull", texp .. "push/pull.png", {dontupdate=true, push = onlypull})
   local pullsideID = addCell("EMC pull-side", texp .. "push/pullside.png", {dontupdate=true, push = onlypullSide})
+  local pullsidewithbarID = addCell("EMC pull-side-bar", texp .. "push/pullsidewithbar.png", {dontupdate=true, push = onlypullSide2})
   ids.crossintaker = addCell("EMC cross-intaker", texp .. "exotic/intakross.png")
   ids.strongerenemy = addCell("EMC stronger-enemy", texp .. "enemies/stronger_enemy.png", {type="enemy",dontupdate=true})
   ids.cross_supgen = addCell("EMC cross-supgen", texp .. "generators/cross_supgen.png")
@@ -1133,8 +1157,10 @@ local function init()
     local pushCat = Toolbar:GetCategory("Pushes")
     pushCat:AddItem("Unpullable", "It can only be pushed. Never pulled", nopullID)
     pushCat:AddItem("Unpullable on sides", "Like a flipped slide cell that only applies to pullers", nopullsideID)
+    pushCat:AddItem("Slide Unpullable on sides", "Unpullable cell on sides but can also be moved on the yellow line", nopullsidewithbarID)
     pushCat:AddItem("Pull cell", "It can only be pulled. Never pushed", pullID)
     pushCat:AddItem("Pull cell on sides", "Like a flipped slide cell that only applies to pushers", pullsideID)
+    pushCat:AddItem("Slide Pull cell on sides", "Pull cell on sides but can also be moved on the yellow line", pullsidewithbarID)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("Cross Super Generator", "Acts like 2 super generators stacked on top of eachother facing perpendicular directions", ids.cross_supgen)
