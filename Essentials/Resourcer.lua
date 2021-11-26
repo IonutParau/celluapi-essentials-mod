@@ -196,6 +196,9 @@ local function loadResource(path)
     local font = love.graphics.newFont(code["font"])
     love.graphics.setFont(font)
   end
+  if code["icon"] then
+    love.window.setIcon(love.image.newImageData(code["icon"]))
+  end
 end
 
 ---@param image string Path of the file containing the image

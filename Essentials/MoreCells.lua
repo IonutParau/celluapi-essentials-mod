@@ -837,13 +837,13 @@ local function DoPortal(id, x, y, food, fx, fy)
     fdir = (fdir + sdir - cells[y][x].rot) % 4
     relativeDir = (relativeDir + sdir - cells[y][x].rot) % 4
     if PushCell(sx, sy, relativeDir, true, 999999999, food.ctype, fdir, nil, {sx, sy, fdir}) then
-      if food.is_hidden_player then
-        local sfx, sfy = GetFullForward(sx, sy, relativeDir)
-        cells[sfy][sfx].is_hidden_player = true
-      end
-      if food.player_hidden_type then
-        local sfx, sfy = GetFullForward(sx, sy, relativeDir)
-        cells[sfy][sfx].ctype = food.player_hidden_type
+      local sfx, sfy = GetFullForward(sx, sy, relativeDir)
+      local sf = walkDivergedPath(sx, sy, sfx, sfy)
+      sfx, sfy = sf.x, sf.y
+      for k, v in pairs(food) do
+        if k ~= "lastvars" and k ~= "rot" and k ~= "ctype" and k ~= "updated" then
+          cells[sfy][sfx][k] = v
+        end
       end
     end
   end
@@ -1416,6 +1416,8 @@ local function DoNuclearBomb(x, y, range)
     radius = range*1.2
   })
 
+  local enemiesToPop = {}
+
   for oy=-range, range, 1 do
     for ox=-range, range, 1 do
       local dist = math.sqrt(ox * ox + oy * oy)
@@ -1435,7 +1437,7 @@ local function DoNuclearBomb(x, y, range)
             if bombID == 23 then
               cells[cy][cx].ctype = 12
             elseif isModdedBomb(bombID) then
-              modsOnModEnemyDed(bombID, cx, cy, us, x, y)
+              table.insert(enemiesToPop, {bombID, cx, cy})
             elseif bombID == 50 then
               for dir=0,3 do
                 local ocx, ocy = GetFullForward(cx, cy, dir)
@@ -1463,7 +1465,7 @@ local function DoNuclearBomb(x, y, range)
                 local bombID = cells[cy][cx].ctype
                 cells[cy][cx].ctype = 0
                 if bombID > initialCellCount then
-                  modsOnModEnemyDed(bombID, cx, cy, us, x, y)
+                  table.insert(enemiesToPop, {bombID, cx, cy})
                 end
               end
             elseif cells[cy][cx].ctype ~= 0 then
@@ -1477,6 +1479,12 @@ local function DoNuclearBomb(x, y, range)
           end
         end
       end
+    end
+  end
+
+  for _, bomb in ipairs(enemiesToPop) do
+    if bomb[1] > initialCellCount then
+      modsOnModEnemyDed(bomb[1], bomb[2], bomb[3], us, x, y)
     end
   end
 end
