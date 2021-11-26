@@ -88,6 +88,7 @@ local function init()
 end
 
 local function customupdate(dt)
+  if Keybind then Keybind.CancelNormal(true) end
   if Toolbar then DoToolbarUpdate() end
   if Resourcer then
     if not loadedResourcer then
@@ -181,11 +182,12 @@ local function onKeyPressed(key, code, continuous)
   --   end
   -- end
   if not continuous then
-    if key == 'z' and not love.keyboard.isDown('lctrl') then
+    if key == 'x' and not love.keyboard.isDown('lctrl') then
       local full = love.window.getFullscreen()
       love.window.setFullscreen(not full)
     end
   end
+  runCustomComponentCallback("key", key, code, continuous)
 end
 
 local function onGridRender()

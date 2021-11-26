@@ -1008,8 +1008,8 @@ local function init()
 
   ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash))
 
-  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true})
-  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true})
+  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true, silent = true})
+  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true, silent = true})
 
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
@@ -1255,12 +1255,12 @@ local function DoPlayer(x, y, dir, recursive)
       if id == 11 or id == 12 or id == 23 or id == 50 or isModdedBomb(id) or isModdedTrash(id) or GetSidedTrash(id) ~= nil or GetSidedEnemy(id) ~= nil then
         local fx, fy = GetFullForward(x, y, dir)
         local fid = cells[fy][fx].ctype
-        if (fid == 0) or (fid ~= 11 and fid ~= 12 and fid ~= 23 and fid ~= 50 and (not isModdedBomb(fid)) and (not isModdedTrash(fid))) and (not (GetSidedTrash(fid) ~= nil and GetSidedTrash(fid)(fx, fy, dir) == true)) and (not (GetSidedEnemy(fid) ~= nil and GetSidedEnemy(fid)(fx, fy, dir) == true)) then
+        if (fid == 0) or (fid ~= 11 and fid ~= 12 and fid ~= 23 and fid ~= 50 and (not isModdedBomb(fid)) and (not isModdedTrash(fid))) and (not (GetSidedTrash(fid) ~= nil and GetSidedTrash(fid)(fx, fy, dir) == true)) and (not (GetSidedEnemy(fid) ~= nil and GetSidedEnemy(fid)(fx, fy, dir) == true) and fid ~= 47 and fid ~= 48) then
           if PushCell(x, y, dir, true, 1) then
             FakeMoveForward(x, y, dir)
           end
         else
-          if fid == 11 or fid == 50 or isModdedTrash(fid) or (GetSidedTrash(fid) ~= nil) then
+          if fid == 11 or fid == 50 or isModdedTrash(fid) or (GetSidedTrash(fid) ~= nil) or fid == 47 or fid == 48 then
             cells[y][x].is_hidden_player = true
             if isModdedTrash(fid) or (GetSidedTrash(fid) ~= nil) then
               modsOnTrashEat(fid, fx, fy, cells[y][x], x, y)
@@ -1273,8 +1273,15 @@ local function DoPlayer(x, y, dir, recursive)
                   }
                 end
               end
+            elseif fid == 47 or fid == 48 then
+              local frot = cells[fy][fx].rot
+              if fid == 48 then
+                PushCell(fx, fy, frot, true, 1, id, dir)
+              end
+              PushCell(fx, fy, (frot-1)%4, true, 1, id, (dir-1)%4)
+              PushCell(fx, fy, (frot+1)%4, true, 1, id, (dir+1)%4)
             end
-            if not IsSilent(fid) then
+            if (not IsSilent(fid)) and fid ~= 47 and fid ~= 48 then
               destroysound:play()
             end
             cells[y][x].ctype = 0
