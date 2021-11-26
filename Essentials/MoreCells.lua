@@ -443,6 +443,13 @@ local function isConnectable(cell, dir)
       return rdir % 2 == 0
     end
 
+    if id == ids.wireless_sender then
+      return rdir ~= 1
+    end
+    if id == ids.wireless_receiver then
+      return rdir ~= 1
+    end
+
     return true
   elseif isGate(id) then
     if id == ids.g_not then
@@ -922,6 +929,21 @@ local function dontpullSide(x, y, rot, px, py, prot, ptype)
   end
 end
 
+local function onlypull(x, y, rot, px, py, prot, ptype)
+  return ptype == "pull"
+end
+
+local function onlypullSide(x, y, rot, px, py, prot, ptype)
+  local dx, dy = px - x, py - y
+  local dir = DirFromOff(dx, dy)
+
+  if dir % 2 ~= rot % 2 then
+    return true
+  else
+    return ptype == "pull"
+  end
+end
+
 local function init()
   local placeholder = "textures/push.png"
 
@@ -940,8 +962,11 @@ local function init()
   ids.brighterLightBulb = addCell("EMC mech light-bulb-brighter", texp .. "lightbulbs/brighter.png", Options.static)
   ids.brightestLightBulb = addCell("EMC mech light-bulb-brightest", texp .. "lightbulbs/brightest.png", Options.static)
   ids.slideopener = addCell("EMC mech slideopener", texp .. "slideopener.png", Options.mover)
+  ids.crosswire = addCell("EMC mech crosswire", texp .. "wire/cross/cross1.png")
+  ids.clockgen = addCell("EMC mech clock-gen", texp .. "mech/clockgen.png")
   ids.switch = addCell("EMC mech flip-flop", texp .. "mech/tflipflop.png")
-  ids.clockgen_mech = addCell("EMC mech crosswire", texp .. "mech/clockgen.png")
+  ids.wireless_sender = addCell("EMC mech WiFi-S", texp .. "mech/wireless/sender.png")
+  ids.wireless_receiver = addCell("EMC mech WiFi-R", texp .. "mech/wireless/receiver.png")
 
   -- Add gates
   ids.g_and = addCell("EMC gate and", texp .. "gates/and.png", Options.neverupdate)
@@ -959,9 +984,16 @@ local function init()
 
   local nopullID = addCell("EMC no-pull", texp .. "push/nopull.png", {dontupdate=true, push = dontpull})
   local nopullsideID = addCell("EMC no-pull-side", texp .. "push/nopullside.png", {dontupdate=true, push = dontpullSide})
+  local pullID = addCell("EMC pull", texp .. "push/pull.png", {dontupdate=true, push = onlypull})
+  local pullsideID = addCell("EMC pull-side", texp .. "push/pullside.png", {dontupdate=true, push = onlypullSide})
   ids.crossintaker = addCell("EMC cross-intaker", texp .. "exotic/intakross.png")
   ids.strongerenemy = addCell("EMC stronger-enemy", texp .. "enemies/stronger_enemy.png", {type="enemy",dontupdate=true})
   ids.cross_supgen = addCell("EMC cross-supgen", texp .. "generators/cross_supgen.png")
+
+  local weights = {}
+  weights.twice = addCell("EMC weight-2", texp .. "weight/2.png", {weight = 2})
+  weights.three = addCell("EMC weight-3", texp .. "weight/3.png", {weight = 3})
+  weights.four = addCell("EMC weight-4", texp .. "weight/4.png", {weight = 4})
 
   ids.fan = addCell("EMC fan", texp .. "fans/fan.png")
   ids.strongfan = addCell("EMC strong-fan", texp .. "fans/strongfan.png")
@@ -1009,8 +1041,8 @@ local function init()
 
   ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash))
 
-  ids.forward_right_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true, silent = true})
-  ids.forward_left_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true, silent = true})
+  ids.forward_left_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true, silent = true})
+  ids.forward_right_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true, silent = true})
 
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
   SetSidedTrash(ids.forward_right_forker, backOnlySided)
@@ -1052,6 +1084,9 @@ local function init()
     mechGateCat:AddItem("XNOR", "Performs XNOR operation", ids.g_xnor)
     mechGateCat:AddItem("NOT", "Performs NOT operation. Input on back", ids.g_not)
 
+    mechCat:AddItem("Wireless Sender", "Sends a signal wirelessly", ids.wireless_sender)
+    mechCat:AddItem("Wireless Receiver", "Receives a wireless signal", ids.wireless_receiver)
+
     local destCat = Toolbar:GetCategory("Destroyers")
     destCat:AddItem("Stronger Enemy", "When it dies it turns into a strong enemy. Basically a enemy with 3 hp", ids.strongerenemy)
     destCat:AddItem("Enemy Slider", "Acts as an enemy cell but cells can only fall in from 2 sides. Acts as a push cell on other 2 sides", slideEnemy)
@@ -1064,14 +1099,14 @@ local function init()
     destCat:AddItem("Black hole", "Nobody knows what's inside.", ids.blackhole)
 
     local movCat = Toolbar:GetCategory("Movers")
-    movCat:AddItem("Super Impulser", "Impulser up to 11", ids.superimpulser)
+    movCat:AddItem("Super Impulser", "Impulser, but pulls 1 tile from basically infinite tiles orthogonally away", ids.superimpulser)
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
     
-    local fanCat = movCat:AddCategory("Fans", "They create a constant force pushing cells in front.", texp .. "fans/fan.png")
+    local fanCat = movCat:AddCategory("Fans", "Pushes cells out of its range", texp .. "fans/fan.png")
     fanCat:AddItem("Fan", "Only pushes cells directly in front of it", ids.fan)
-    fanCat:AddItem("Super Fan", "Has a range of 2 cell units", ids.strongfan)
-    fanCat:AddItem("Hyper Fan", "Has a range of 4 cell units", ids.hyperfan)
+    fanCat:AddItem("Super Fan", "Has a range of 2 tiles", ids.strongfan)
+    fanCat:AddItem("Hyper Fan", "Has a range of 4 tiles", ids.hyperfan)
     
     movCat:AddItem("Conveyor Cell", "Pushes the cells on its sides forward", ids.conveyor)
     movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
@@ -1081,26 +1116,50 @@ local function init()
     genCat:AddItem("4-way Replicator", "Replicates stuff on all 4 sides.", ids.rep4)
 
     local forkerCat = Toolbar:GetCategory("Forkers")
-    forkerCat:AddItem("Forward-Right Forker", "Name says it all", ids.forward_right_forker)
-    forkerCat:AddItem("Forward-Left Forker", "Name says it all", ids.forward_left_forker)
+    forkerCat:AddItem("Forward-Right Forker", "Replicates to its front and right", ids.forward_right_forker)
+    forkerCat:AddItem("Forward-Left Forker", "Replicates to its front and left", ids.forward_left_forker)
 
     local uniqueCat = Toolbar:GetCategory("Unique cells")
     uniqueCat:AddItem("Cross Intaker", "Acts like 2 intakers stacked on top of eachother facing perpendicular directions", ids.crossintaker)
-    uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595\nWhen placing a cell on a monitor, the monitor will display that cell", ids.monitor)
+    uniqueCat:AddItem("Monitor", "GuyWithAMonitor#1595\nWhen placing a cell on it, it will display that cell on the screen", ids.monitor)
     uniqueCat:AddItem("The Musical Cell", "\"At last, it has come.\" \nIs a trash cell but plays a special sound based off of where the cell came from.", ids.musical)
-    uniqueCat:AddItem("Player Cell", "Cell that can be controlled by the I, J and L keys. You can even control multiple at once!", ids.player)
-    uniqueCat:AddItem("Seeker Cell", "Hunts down players. Just make sure it doesn't get too close", ids.seeker)
+    uniqueCat:AddItem("Player Cell", "Can be controlled by the arrow keys. You can even control multiple at once!", ids.player)
+    uniqueCat:AddItem("Seeker Cell", "Hunts down Player Cells. Just make sure it doesn't get too close or else the Player Cell gets destroyed!", ids.seeker)
     uniqueCat:AddItem("Portal A", "When something falls in, it gets sent to the nearest portal B", ids.portal_a)
     uniqueCat:AddItem("Portal B", "When something falls in, it gets sent to the nearest portal A", ids.portal_b)
     uniqueCat:AddItem("Matter Converter", "Converts the cell behind it to a matter blob", ids.matterConverter)
     --uniqueCat:AddItem("Matter Blob", "", ids.matterBlob)
 
     local pushCat = Toolbar:GetCategory("Pushes")
-    pushCat:AddItem("Unpullable", "It can only be moved. Never pulled", nopullID)
+    pushCat:AddItem("Unpullable", "It can only be pushed. Never pulled", nopullID)
     pushCat:AddItem("Unpullable on sides", "Like a flipped slide cell that only applies to pullers", nopullsideID)
+    pushCat:AddItem("Pull cell", "It can only be pulled. Never pushed", pullID)
+    pushCat:AddItem("Pull cell on sides", "Like a flipped slide cell that only applies to pushers", pullsideID)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("Cross Super Generator", "Acts like 2 super generators stacked on top of eachother facing perpendicular directions", ids.cross_supgen)
+  
+    local weightCat = Toolbar:GetCategory("Weight")
+    weightCat:AddItem("Double Weight", "Stops 2 movers", weights.twice)
+    weightCat:AddItem("Triple Weight", "Stops 3 movers", weights.three)
+    weightCat:AddItem("Quadruple Weight", "Stops 4 movers", weights.four)
+  end
+end
+
+local function DoWirelessSender(x, y, dir)
+  dir = (dir-1)%4
+  local cx, cy = x, y
+  while true do
+    cx, cy = GetFullForward(cx, cy, dir)
+    if not inGrid(cx, cy) then break end
+
+    cells[cy][cx].testvar = "Wireless"
+
+    if cells[cy][cx].ctype == ids.wireless_receiver and cells[cy][cx].rot == (dir+3) % 4 then
+      --local fx, fy = GetFullForward(cx, cy, dir)
+      SignalMechanical(cx, cy, (dir+2)%4)
+      break
+    end
   end
 end
 
@@ -1380,10 +1439,18 @@ local function DoMusicalCell(sound)
   playSound(sounds[sound])
 end
 
+local function IsPlayer(cell)
+  if cell.ctype == ids.player then return true end
+  if cell.matter_stored_cell then return IsPlayer(cell.matter_stored_cell) end
+  return false
+end
+
 local function DoMatterBlob(x, y, dir)
   local fx, fy = GetFullForward(x, y, dir)
 
-  if cells[fy][fx].ctype == 0 or cells[fy][fx].ctype == ids.matterBlob then
+  local fid = cells[fy][fx].ctype
+
+  if cells[fy][fx].ctype == 0 or cells[fy][fx].ctype == ids.matterBlob or fid == 11 or fid == 12 or fid == 23 or isModdedBomb(fid) or isModdedTrash(fid) or (GetSidedTrash(fid) ~= nil and GetSidedTrash(fid)(fx, fy, dir) == true) or (GetSidedEnemy(fid) ~= nil and GetSidedEnemy(fid)(fx, fy, dir) == true) then
     local bx, by = GetFullForward(x, y, dir, -1)
     PushCell(bx, by, dir, true, 0)
   else
@@ -1643,6 +1710,8 @@ local function update(id, x, y, dir)
   elseif id == ids.cross_supgen then
     DoSuperGenerator(x, y, dir)
     DoSuperGenerator(x, y, (dir-1)%4)
+  elseif id == ids.wireless_sender and isMechOn(x, y) then
+    DoWirelessSender(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1733,6 +1802,9 @@ local function tick()
   playerPosCache = nil
   for y=1,height-1 do
     for x=1,width-1 do
+      if cells[y][x].matter_stored_cell and cells[y][x].ctype ~= ids.matterBlob then
+        cells[y][x].matter_stored_cell = nil
+      end
       if cells[y][x].radioactive then
         for oy=-3,3 do
           for ox=-3,3 do
@@ -1782,6 +1854,7 @@ end
 local function onPlace(id, x, y, rot, original, originalInitial)
   cells[y][x].mech_signal = 0
   cells[y][x].is_hidden_player = false
+  cells[y][x].matter_stored_cell = nil
 
   if original.ctype == ids.monitor and id ~= ids.monitor and id ~= 0 then
     cells[y][x] = original
@@ -1798,7 +1871,7 @@ local function onPlace(id, x, y, rot, original, originalInitial)
   elseif id == ids.player and econfig['player_lock'] == true then
     for cy=1,height-1 do
       for cx=1,width-1 do
-        if (cells[cy][cx].ctype == ids.player or cells[cy][cx].is_hidden_player) and (cx ~= x or cy ~= y) then
+        if (cells[cy][cx].ctype == ids.player or cells[cy][cx].is_hidden_player or IsPlayer(cells[cy][cx])) and (cx ~= x or cy ~= y) then
           cells[y][x] = original
           initial[y][x] = originalInitial
           return
