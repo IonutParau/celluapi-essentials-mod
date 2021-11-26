@@ -923,7 +923,7 @@ local function dontpullSide(x, y, rot, px, py, prot, ptype)
   local dir = DirFromOff(dx, dy)
 
   if dir % 2 ~= rot % 2 then
-    return true
+    return false
   else
     return ptype ~= "pull"
   end
@@ -938,7 +938,7 @@ local function onlypullSide(x, y, rot, px, py, prot, ptype)
   local dir = DirFromOff(dx, dy)
 
   if dir % 2 ~= rot % 2 then
-    return true
+    return false
   else
     return ptype == "pull"
   end
