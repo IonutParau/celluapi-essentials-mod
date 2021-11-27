@@ -1767,6 +1767,16 @@ local function update(id, x, y, dir)
   end
 end
 
+local function isCrosswireOn(x, y, dir)
+  local fx, fy = GetFullForward(x, y, dir)
+
+  if cells[fy][fx].ctype == ids.crosswire then
+    return isCrosswireOn(fx, fy, dir)
+  else
+    return isMechOn(fx, fy)
+  end
+end
+
 local function onCellDraw(id, x, y, rot)
   local rrot = LerpRotation((cells[y][x].lastvars or {x, y, rot})[3], rot)
 
@@ -1814,7 +1824,7 @@ local function onCellDraw(id, x, y, rot)
         renderArm(dir)
       end
 
-      if isMechOn(ox, oy) then
+      if isCrosswireOn(x, y, dir) then
         if rot % 2 == dir % 2 then
           renderPower2(rot)
         else
