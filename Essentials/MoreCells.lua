@@ -11,6 +11,8 @@ local half_pi = math.pi / 2
 
 local MAX_MECH = 2
 
+local tickCount = 0
+
 function UpdateCell(id, x, y, dir, isPlayer)
   if id == 1 then
     DoMover(x, y, dir)
@@ -431,7 +433,7 @@ local function isConnectable(cell, dir)
   local rdir = (dir - cell.rot) % 4
 
   if isMech(id) then
-    if id == ids.wire or id == ids.activator or id == ids.mech_gen then
+    if id == ids.wire or id == ids.activator or id == ids.mech_gen or id == ids.clockgen then
       return true
     end
 
@@ -439,7 +441,7 @@ local function isConnectable(cell, dir)
       return rdir ~= 2
     end
 
-    if id == ids.delayer then
+    if id == ids.delayer or id == ids.switch then
       return rdir % 2 == 0
     end
 
@@ -1110,6 +1112,8 @@ local function init()
 
     mechCat:AddItem("Wireless Sender", "Sends a signal wirelessly", ids.wireless_sender)
     mechCat:AddItem("Wireless Receiver", "Receives a wireless signal", ids.wireless_receiver)
+    mechCat:AddItem("Clock Generator", "A slower generator", ids.clockgen)
+    mechCat:AddItem("Switch", "When it is powered, it will toggle itself. It's output is whether it is toggled.", ids.switch)
 
     local destCat = Toolbar:GetCategory("Destroyers")
     destCat:AddItem("Stronger Enemy", "When it dies it turns into a strong enemy. Basically a enemy with 3 hp", ids.strongerenemy)
@@ -1664,6 +1668,17 @@ local function DoFakeIntaker(x, y, dir)
   PullCell(ffx, ffy, (dir+2)%4, false, 1)
 end
 
+local function DoSwitch(x, y, dir)
+  if isMechOn(x, y) and not wasMechOn(x, y) then
+    cells[y][x].switch_toggled = not cells[y][x].switch_toggled
+  end
+
+  if cells[y][x].switch_toggled then
+    local fx, fy = GetFullForward(x, y, dir)
+    SignalMechanical(fx, fy, (dir+2)%4)
+  end
+end
+
 local function update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
@@ -1738,6 +1753,12 @@ local function update(id, x, y, dir)
     DoSuperGenerator(x, y, (dir-1)%4)
   elseif id == ids.wireless_sender and isMechOn(x, y) then
     DoWirelessSender(x, y, dir)
+  elseif id == ids.clockgen then
+    if tickCount % 3 == 0 then
+      SignalMechanical(x, y)
+    end
+  elseif id == ids.switch then
+    DoSwitch(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -1825,6 +1846,7 @@ local function onCellDraw(id, x, y, rot)
 end
 
 local function tick()
+  tickCount = tickCount + 1
   playerPosCache = nil
   for y=1,height-1 do
     for x=1,width-1 do
