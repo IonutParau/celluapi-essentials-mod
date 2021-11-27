@@ -10,5 +10,6 @@
   "resourcer_path": "Essentials/Resources",
   "resourcer_overlay_transparency": true,
   "disable_music": false,
-  "player_lock": true
+  "player_lock": true,
+  "graviton_mass": "infinity"
 }

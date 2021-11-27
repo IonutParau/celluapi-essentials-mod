@@ -1027,9 +1027,9 @@ local function init()
   weights.three = addCell("EMC weight-3", texp .. "weight/3.png", {weight = 3})
   weights.four = addCell("EMC weight-4", texp .. "weight/4.png", {weight = 4})
 
-  ids.fan = addCell("EMC fan", texp .. "fans/fan.png")
-  ids.strongfan = addCell("EMC strong-fan", texp .. "fans/strongfan.png")
-  ids.hyperfan = addCell("EMC hyper-fan", texp .. "fans/hyperfan.png")
+  ids.fan = addCell("EMC fan", texp .. "movers/fans/fan.png")
+  ids.strongfan = addCell("EMC strong-fan", texp .. "movers/fans/strongfan.png")
+  ids.hyperfan = addCell("EMC hyper-fan", texp .. "movers/fans/hyperfan.png")
   ids.conveyor = addCell("EMC conveyor", texp .. "conveyor.png")
   ids.monitor = addCell("EMC monitor", texp .. "monitor.png", Options.neverupdate)
   ids.musical = addCell("EMC musical", texp .. "musical.png", {type = "trash", silent = true, dontupdate = true})
@@ -1040,6 +1040,8 @@ local function init()
   ids.nuclearBomb = addCell("EMC nuclear bomb", texp .. "nuclear_bomb.png", {type="enemy", dontupdate = true})
   ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1}))
   ids.superimpulser = addCell("EMC super-impulser", texp .. "superimpulser.png")
+  ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
+  ids.graviton = addCell("EMC graviton", placeholder)
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1137,13 +1139,15 @@ local function init()
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
     
-    local fanCat = movCat:AddCategory("Fans", "Pushes cells out of its range", texp .. "fans/fan.png")
+    local fanCat = movCat:AddCategory("Fans", "Pushes cells out of its range", texp .. "movers/fans/fan.png")
     fanCat:AddItem("Fan", "Only pushes cells directly in front of it", ids.fan)
     fanCat:AddItem("Super Fan", "Has a range of 2 tiles", ids.strongfan)
     fanCat:AddItem("Hyper Fan", "Has a range of 4 tiles", ids.hyperfan)
     
     movCat:AddItem("Conveyor Cell", "Pushes the cells on its sides forward", ids.conveyor)
     movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
+    movCat:AddItem("Graviton", "Falls down. It will fall down with more force the lower it is at", ids.graviton)
+    movCat:AddItem("Grabber", "Grabs stuff", ids.grabber)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
@@ -1685,6 +1689,77 @@ local function DoSwitch(x, y, dir)
   end
 end
 
+local function doSmartMover(id, x, y, dir)
+  local force = 1
+  if id == 1 or id == 13 or id == 27 or moddedMovers[id] then
+    force = force - 1
+  end
+  if cellWeights[id] or id == 21 then
+    force = force + (cellWeights[id] or 1)
+  end
+  local bx, by = GetFullForward(x, y, dir, -1)
+  PushCell(bx, by, dir, true, force)
+end
+
+local function weakMover(x, y, dir)
+  local fx, fy = GetFullForward(x, y, dir)
+
+  local f = walkDivergedPath(x, y, fx, fy)
+  fx = f.x
+  fy = f.y
+
+  if cells[fy][fx].ctype == 0 then
+    --error("yeet")
+    doSmartMover(cells[y][x].ctype, x, y, dir)
+    return true
+  end
+  return false
+end
+
+local function grab(x, y, dir, variant)
+  variant = variant or "normal"
+  
+  if variant == "normal" then -- Average grabber
+    weakMover(x, y, dir)
+  elseif variant == "trans" then -- Transporter
+    PullCell(x, y, dir)
+  elseif variant == "haul" then -- Hauler
+    doSmartMover(cells[y][x].ctype, x, y, dir)
+  end
+end
+
+local function DoGrabber(x, y, dir)
+  if weakMover(x, y, dir) then
+    local lx, ly = GetFullForward(x, y, (dir-1)%4)
+    local rx, ry = GetFullForward(x, y, (dir+1)%4)
+    grab(lx, ly, dir)
+    grab(rx, ry, dir)
+  end
+end
+
+local gravitonMass = (econfig['graviton_mass'] or 1)
+
+if gravitonMass == "infinity" then
+  gravitonMass = 1/0
+end
+
+local function DoGraviton(x, y, mass)
+  if mass == 0 then return end
+  mass = mass or gravitonMass
+  local force = math.floor(y / 40 * mass)
+  cells[y][x].testvar = height - y + 1
+  local ux, uy = GetFullForward(x, y, 3)
+  if PushCell(ux, uy, 1, true, force+1) then
+    local fx, fy = GetFullForward(x, y, 1)
+    local f = walkDivergedPath(x, y, fx, fy)
+    fx = f.x
+    fy = f.y
+    if inGrid(fx, fy) and cells[fy][fx].ctype == ids.graviton then
+      DoGraviton(fx, fy, mass-1)
+    end
+  end
+end
+
 local function update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
@@ -1765,6 +1840,10 @@ local function update(id, x, y, dir)
     end
   elseif id == ids.switch then
     DoSwitch(x, y, dir)
+  elseif id == ids.graviton then
+    DoGraviton(x, y)
+  elseif id == ids.grabber then
+    DoGrabber(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
