@@ -859,6 +859,7 @@ local function DoPortal(id, x, y, food, fx, fy)
           cells[sfy][sfx][k] = v
         end
       end
+      cells[sfy][sfx].updated = true
     end
   end
 end
