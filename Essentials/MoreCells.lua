@@ -1041,7 +1041,7 @@ local function init()
   ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1}))
   ids.superimpulser = addCell("EMC super-impulser", texp .. "superimpulser.png")
   ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
-  ids.graviton = addCell("EMC graviton", placeholder)
+  ids.graviton = addCell("EMC graviton", texp .. "movers/graviton.png")
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
