@@ -709,7 +709,7 @@ end
 local function FakeMoveForward(x, y, dir, replacetype, replacerot)
   replacetype = replacetype or 0
   replacerot = replacerot or 0
-  local front = GetForward(dir)
+  local fx, fy = GetFullForward(x, y, dir)
 
   local us = CopyTable(cells[y][x])
 
@@ -718,8 +718,13 @@ local function FakeMoveForward(x, y, dir, replacetype, replacerot)
     rot = replacerot
   }
 
-  cells[y+front.y][x+front.x] = us
-  SetChunk(x+front.x, y+front.y, us.ctype)
+  local f = walkDivergedPath(x, y, fx, fy)
+  fx = f.x
+  fy = f.y
+  local addedRot = (f.dir - dir) % 4
+  us.rot = (addedRot + us.rot) % 4
+  cells[fy][fx] = us
+  SetChunk(fx, fy, us.ctype)
 end
 
 local function DoEnemyMover(x, y, dir)
@@ -1342,7 +1347,7 @@ local function DoPlayer(x, y, dir, recursive)
   if love.keyboard.isDown('up') and not recursive then
     if love.keyboard.isDown('lshift') then
       local id = cells[y][x].ctype
-      if id == 11 or id == 12 or id == 23 or id == 50 or isModdedBomb(id) or isModdedTrash(id) or GetSidedTrash(id) ~= nil or GetSidedEnemy(id) ~= nil then
+      if id == 11 or id == 12 or id == 23 or id == 50 or isModdedBomb(id) or isModdedTrash(id) or GetSidedTrash(id) ~= nil or GetSidedEnemy(id) ~= nil or id == 15 or id == 30 or id == 37 or id == 38 or moddedDivergers[id] ~= nil then
         local fx, fy = GetFullForward(x, y, dir)
         local fid = cells[fy][fx].ctype
         if (fid == 0) or (fid ~= 11 and fid ~= 12 and fid ~= 23 and fid ~= 50 and (not isModdedBomb(fid)) and (not isModdedTrash(fid))) and (not (GetSidedTrash(fid) ~= nil and GetSidedTrash(fid)(fx, fy, dir) == true)) and (not (GetSidedEnemy(fid) ~= nil and GetSidedEnemy(fid)(fx, fy, dir) == true) and fid ~= 47 and fid ~= 48) then
