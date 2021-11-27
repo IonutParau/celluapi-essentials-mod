@@ -99,8 +99,9 @@ end
 --- @param name string
 --- @param description string
 --- @param image string
+--- @param index number
 --- @return ToolbarSystem.Category
-local function AddCategory(self, name, description, image)
+local function AddCategory(self, name, description, image, index)
   local c = ToolbarSystem.Category()
   c.display = name
   c.description = description
@@ -115,7 +116,11 @@ local function AddCategory(self, name, description, image)
   c:AddItem("Back", "Takes you back", backp)
   c.hypercat = self
   self:FixItems()
-  table.insert(self.items, c)
+  if index == nil then
+    table.insert(self.items, c)
+  else
+    table.insert(self.items, index, c)
+  end
   return c
 end
 
@@ -123,8 +128,9 @@ end
 --- @param cellID number|string
 --- @param name string
 --- @param description string
+--- @param index number|nil
 --- @return ToolbarSystem.Item
-local function AddItem(self, name, description, cellID)
+local function AddItem(self, name, description, cellID, index)
   local i = ToolbarSystem.Item()
   i.display = name
   i.description = description
@@ -132,7 +138,11 @@ local function AddItem(self, name, description, cellID)
   if cellID ~= backp then
     self:FixItems()
   end
-  table.insert(self.items, i)
+  if index == nil then
+    table.insert(self.items, i)
+  else
+    table.insert(self.items, index, i)
+  end
   return i
 end
 
