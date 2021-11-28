@@ -524,7 +524,7 @@ local function DoMotionSensor(x, y, dir)
   local past = cells[y][x].motion_past_cell
   local now = cells[oy][ox]
 
-  if not equals(past, now) and not equals(now.lastvars, past.lastvars) then
+  if (past.ctype ~= now.ctype) or (past.rot ~= now.rot) then
     cells[y][x].motion_past_cell = CopyTable(cells[oy][ox])
     SignalMechanical(x, y)
   end
