@@ -1040,8 +1040,12 @@ local function init()
   ids.nuclearBomb = addCell("EMC nuclear bomb", texp .. "nuclear_bomb.png", {type="enemy", dontupdate = true})
   ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1}))
   ids.superimpulser = addCell("EMC super-impulser", texp .. "superimpulser.png")
-  ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
   ids.graviton = addCell("EMC graviton", texp .. "movers/graviton.png")
+  ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
+  ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
+  ids.transporter = addCell("EMC transporter", texp .. "movers/grabbers/transporter.png", Options.mover)
+  ids.hauler = addCell("EMC hauler", texp .. "movers/grabbers/hauler.png", Options.mover)
+  ids.lifter = addCell("EMC lifter", texp .. "movers/grabbers/lifter.png", Options.mover)
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1148,6 +1152,9 @@ local function init()
     movCat:AddItem("Magnet", "Pushes on one side and pulls on the other.", ids.magnet)
     movCat:AddItem("Graviton", "Falls down. It will fall down with more force the lower it is at", ids.graviton)
     movCat:AddItem("Grabber", "Grabs stuff", ids.grabber)
+    movCat:AddItem("Transporter", "Grabber that also pulls", ids.transporter)
+    movCat:AddItem("Hauler", "Grabber that also pushes", ids.hauler)
+    movCat:AddItem("Lifter", "Grabber that pulls and pushes", ids.lifter)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
@@ -1698,7 +1705,7 @@ local function doSmartMover(id, x, y, dir)
     force = force + (cellWeights[id] or 1)
   end
   local bx, by = GetFullForward(x, y, dir, -1)
-  PushCell(bx, by, dir, true, force)
+  return PushCell(bx, by, dir, true, force)
 end
 
 local function weakMover(x, y, dir)
@@ -1716,24 +1723,79 @@ local function weakMover(x, y, dir)
   return false
 end
 
+local function doSmartPull(id, x, y, dir)
+  local force = 1
+  if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
+    force = force - 1
+  end
+
+  if id == 21 or cellWeights[id] ~= nil then
+    force = force - (cellWeights[id] or 1)
+  end
+
+  return PullCell(x, y, dir, false, force, true)
+end
+
+local function doSmartAdvancer(id, x, y, dir)
+  local force = 1
+  if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
+    force = force - 1
+  end
+
+  if id == 21 or cellWeights[id] ~= nil then
+    force = force - (cellWeights[id] or 1)
+  end
+
+  local bx, by = GetFullForward(x, y, dir, -1)
+
+  if PushCell(bx, by, dir, true, force) and cells[y][x].ctype == 0 then
+    return PullCell(x,y,dir,true,force+1,true,true,true)
+  else
+    return false
+  end
+end
+
 local function grab(x, y, dir, variant)
   variant = variant or "normal"
   
   if variant == "normal" then -- Average grabber
     weakMover(x, y, dir)
   elseif variant == "trans" then -- Transporter
-    PullCell(x, y, dir)
+    local fx, fy = GetFullForward(x, y, dir, 0)
+    doSmartPull(cells[y][x].ctype, fx, fy, dir)
   elseif variant == "haul" then -- Hauler
     doSmartMover(cells[y][x].ctype, x, y, dir)
+  elseif variant == "lift" then
+    doSmartAdvancer(cells[y][x].ctype, x, y, dir)
   end
 end
 
-local function DoGrabber(x, y, dir)
-  if weakMover(x, y, dir) then
+local function DoGrabber(id, x, y, dir, frommove)
+  if frommove then
     local lx, ly = GetFullForward(x, y, (dir-1)%4)
     local rx, ry = GetFullForward(x, y, (dir+1)%4)
     grab(lx, ly, dir)
     grab(rx, ry, dir)
+    return
+  end
+  local variant = "normal"
+  if id == ids.lifter then variant = "lift" end
+  if id == ids.hauler then variant = "haul" end
+  if id == ids.transporter then variant = "trans" end
+  local dograb = function()
+    local lx, ly = GetFullForward(x, y, (dir-1)%4)
+    local rx, ry = GetFullForward(x, y, (dir+1)%4)
+    grab(lx, ly, dir, variant)
+    grab(rx, ry, dir, variant)
+  end
+  if variant == "normal" and weakMover(x, y, dir) then
+    dograb()
+  elseif variant == "trans" and PullCell(x, y, dir) then
+    dograb()
+  elseif variant == "haul" and doSmartMover(id, x, y, dir) then
+    dograb()
+  elseif variant == "lift" and doSmartAdvancer(id, x, y, dir) then
+    dograb()
   end
 end
 
@@ -1842,8 +1904,8 @@ local function update(id, x, y, dir)
     DoSwitch(x, y, dir)
   elseif id == ids.graviton then
     DoGraviton(x, y)
-  elseif id == ids.grabber then
-    DoGrabber(x, y, dir)
+  elseif id == ids.grabber or id == ids.transporter or id == ids.hauler or id == ids.lifter then
+    DoGrabber(id, x, y, dir, false)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -2176,12 +2238,12 @@ local function onEnemyDies(id, x, y, killer, kx, ky)
   end
 end
 
--- local function onMove(id, x, y, rot)
---   if id == ids.movementSensor and not cells[y][x].updated then
---     cells[y][x].updated = true
---     SignalMechanical(x, y, rot, true)
---   end
--- end
+local function onMove(id, x, y, rot)
+  if id == ids.grabber or id == ids.transporter or id == ids.hauler or id == ids.lifter then
+    local bx, by = GetFullForward(x, y, rot, -1)
+    DoGrabber(id, bx, by, rot, true)
+  end
+end
 
 local playTime = 0
 local loadedPlayerFix = false
