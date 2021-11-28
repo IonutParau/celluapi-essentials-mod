@@ -1039,13 +1039,14 @@ local function init()
   ids.matterConverter = addCell("EMC matter converter", texp .. "matter/converter.png")
   ids.nuclearBomb = addCell("EMC nuclear bomb", texp .. "nuclear_bomb.png", {type="enemy", dontupdate = true})
   ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1}))
-  ids.superimpulser = addCell("EMC super-impulser", texp .. "superimpulser.png")
+  ids.superimpulser = addCell("EMC super-impulser", texp .. "superimpulser.png", {static = true})
   ids.graviton = addCell("EMC graviton", texp .. "movers/graviton.png")
   ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
   ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
   ids.transporter = addCell("EMC transporter", texp .. "movers/grabbers/transporter.png", Options.mover)
   ids.hauler = addCell("EMC hauler", texp .. "movers/grabbers/hauler.png", Options.mover)
   ids.lifter = addCell("EMC lifter", texp .. "movers/grabbers/lifter.png", Options.mover)
+  ids.crosspulser = addCell("EMC crosspulser", texp .. "movers/crosspulser.png", {static = true})
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1140,6 +1141,7 @@ local function init()
 
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Super Impulser", "Impulser, but pulls 1 tile from basically infinite tiles orthogonally away", ids.superimpulser)
+    movCat:AddItem("CrossPulser", "Half Impulser Half Repulser", ids.crosspulser)
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
     
@@ -1738,8 +1740,10 @@ end
 
 local function doSmartAdvancer(id, x, y, dir)
   local force = 1
+  local aforce = 0
   if id == 1 or id == 13 or id == 27 or moddedMovers[id] ~= nil then
     force = force - 1
+    aforce = aforce + 1
   end
 
   if id == 21 or cellWeights[id] ~= nil then
@@ -1748,8 +1752,8 @@ local function doSmartAdvancer(id, x, y, dir)
 
   local bx, by = GetFullForward(x, y, dir, -1)
 
-  if PushCell(bx, by, dir, true, force) and cells[y][x].ctype == 0 then
-    return PullCell(x,y,dir,true,force+1,true,true,true)
+  if PushCell(bx, by, dir, true, force+aforce) and cells[y][x].ctype == 0 then
+    return PullCell(x,y,dir,true,force+aforce,true,true,true)
   else
     return false
   end
@@ -1906,6 +1910,15 @@ local function update(id, x, y, dir)
     DoGraviton(x, y)
   elseif id == ids.grabber or id == ids.transporter or id == ids.hauler or id == ids.lifter then
     DoGrabber(id, x, y, dir, false)
+  elseif id == ids.crosspulser then
+    dir = cells[y][x].rot
+    PushCell(x, y, (dir-1)%4, true, 1)
+    PushCell(x, y, dir, true, 1)
+
+    for _, pdir in ipairs({(dir+1)%4, (dir+2)%4}) do
+      local ox, oy = GetFullForward(x, y, pdir, 2)
+      PullCell(ox, oy, (pdir+2)%4, false, 1)
+    end
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
