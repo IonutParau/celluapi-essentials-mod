@@ -411,6 +411,10 @@ local function GetFullForward(x, y, dir, amount)
   return x + off.x, y + off.y
 end
 
+Mechanical = {
+  cells = {},
+}
+
 local function isMech(id)
   local l = getCellLabelById(id) or id
 
@@ -427,10 +431,16 @@ local function isGate(id)
   return (l:sub(1, #suffix) == suffix)
 end
 
-local function isConnectable(cell, dir)
+function Mechanical.isConnectable(cell, dir)
   local id = cell.ctype
 
   local rdir = (dir - cell.rot) % 4
+
+  local mechCell = Mechanical.cells[id]
+
+  if mechCell ~= nil then
+    return mechCell.connectable(cell, (rdir + 2) % 4)
+  end
 
   if isMech(id) then
     if id == ids.wire or id == ids.activator or id == ids.mech_gen or id == ids.clockgen then
@@ -464,7 +474,15 @@ local function isConnectable(cell, dir)
   return false
 end
 
-local function isMechOn(x, y)
+function Mechanical.add(id, connectable)
+  local c = {
+    id = id,
+    connectable = connectable or function() return true end,
+  }
+  Mechanical.cells[id] = c
+end
+
+function Mechanical.isOn(x, y)
   --if not isMech(cells[y][x].ctype) then return false end
   local s = cells[y][x].mech_signal
   if s == nil then s = 0 end
@@ -472,7 +490,7 @@ local function isMechOn(x, y)
   return s > 0
 end
 
-local function wasMechOn(x, y)
+function Mechanical.wasOn(x, y)
   --if not isMech(cells[y][x].ctype) then return false end
   local s = cells[y][x].prev_mech_signal
   if s == nil then s = 0 end
@@ -480,7 +498,7 @@ local function wasMechOn(x, y)
   return s > 0
 end
 
-function SignalMechanical(x, y, blockdir, forced)
+function Mechanical.sendSignal(x, y, blockdir, forced)
   if not isMech(cells[y][x].ctype) then return end
 
   if forced == nil then
@@ -500,12 +518,12 @@ function SignalMechanical(x, y, blockdir, forced)
       if not forced then
         canSpread = (cells[y][x].ctype == ids.wire)
       end
-      if isMech(cells[oy][ox].ctype) and isConnectable(cells[oy][ox], i) and canSpread and ((cells[oy][ox].mech_signal or 0) < MAX_MECH) then
+      if isMech(cells[oy][ox].ctype) and Mechanical.isConnectable(cells[oy][ox], i) and canSpread and ((cells[oy][ox].mech_signal or 0) < MAX_MECH) then
         if cells[oy][ox].ctype == ids.crosswire then
           local fx, fy = GetFullForward(ox, oy, i)
-          SignalMechanical(fx, fy, (i+2)%4, true)
+          Mechanical.sendSignal(fx, fy, (i+2)%4, true)
         else
-          SignalMechanical(ox, oy, nil, false)
+          Mechanical.sendSignal(ox, oy, nil, false)
         end
       end
     end
@@ -526,12 +544,12 @@ local function DoMotionSensor(x, y, dir)
 
   if (past.ctype ~= now.ctype) or (past.rot ~= now.rot) then
     cells[y][x].motion_past_cell = CopyTable(cells[oy][ox])
-    SignalMechanical(x, y)
+    Mechanical.sendSignal(x, y)
   end
 end
 
 local function DoActivator(x, y)
-  if not isMechOn(x, y) then
+  if not Mechanical.isOn(x, y) then
     for dir=0,3 do
       local off = GetForward(dir)
       local ox, oy = x + off.x, y + off.y
@@ -544,16 +562,16 @@ local function DoActivator(x, y)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
-  if isMechOn(x, y) then
+  if Mechanical.isOn(x, y) then
     cells[y][x].mech_signal = cells[y][x].mech_signal - 1
   end
 end
 
 local function DoDelayer(x, y)
-  if isMechOn(x, y) then
+  if Mechanical.isOn(x, y) then
     local front = GetForward(cells[y][x].rot)
     local fx, fy = x + front.x, y + front.y
-    SignalMechanical(fx, fy, (cells[y][x].rot+2)%4, false)
+    Mechanical.sendSignal(fx, fy, (cells[y][x].rot+2)%4, false)
     cells[y][x].mech_signal = 0
   end
 end
@@ -565,8 +583,8 @@ local function DoLogicGate(x, y, dir, type)
     local backOff = GetForward(dir+2)
 
     if isMech(cells[y+frontOff.y][x+frontOff.x].ctype) then
-      if not isMechOn(x+backOff.x, y+backOff.y) then
-        SignalMechanical(x+frontOff.x, y+frontOff.y)
+      if not Mechanical.isOn(x+backOff.x, y+backOff.y) then
+        Mechanical.sendSignal(x+frontOff.x, y+frontOff.y)
       end
     end
   else
@@ -580,10 +598,10 @@ local function DoLogicGate(x, y, dir, type)
     -- cells[ly][lx].ctype = 40
     -- cells[oy][ox].ctype = 40
 
-    local d1, d2 = isMechOn(lx, ly) == true, isMechOn(rx, ry) == true
+    local d1, d2 = Mechanical.isOn(lx, ly) == true, Mechanical.isOn(rx, ry) == true
 
     local p = function()
-      SignalMechanical(ox, oy, (dir+2)%4)
+      Mechanical.sendSignal(ox, oy, (dir+2)%4)
     end
 
     if type == "and" and (d1 and d2) then
@@ -808,9 +826,9 @@ local function DoTrashMover(x, y, dir)
 end
 
 local function DoStickyPiston(x, y, dir)
-  if isMechOn(x, y) then
+  if Mechanical.isOn(x, y) then
     PushCell(x, y, dir)
-  elseif wasMechOn(x, y) then
+  elseif Mechanical.wasOn(x, y) then
     local fx, fy = GetFullForward(x, y, dir, 2)
 
     PullCell(fx, fy, (dir+2)%4, false, 1)
@@ -1206,20 +1224,20 @@ local function DoWirelessSender(x, y, dir)
 
     if cells[cy][cx].ctype == ids.wireless_receiver and cells[cy][cx].rot == (dir+3) % 4 then
       --local fx, fy = GetFullForward(cx, cy, dir)
-      SignalMechanical(cx, cy, (dir+2)%4)
+      Mechanical.sendSignal(cx, cy, (dir+2)%4)
       break
     end
   end
 end
 
 local function DoPiston(x, y, dir)
-  if isMechOn(x, y) then
+  if Mechanical.isOn(x, y) then
     PushCell(x, y, dir)
   end
 end
 
 local function DoLightbulb(x, y)
-  if isMechOn(x, y) then
+  if Mechanical.isOn(x, y) then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
     local radius = 5
 
@@ -1688,13 +1706,13 @@ local function DoFakeIntaker(x, y, dir)
 end
 
 local function DoSwitch(x, y, dir)
-  if isMechOn(x, y) and not wasMechOn(x, y) then
+  if Mechanical.isOn(x, y) and not Mechanical.wasOn(x, y) then
     cells[y][x].switch_toggled = not cells[y][x].switch_toggled
   end
 
   if cells[y][x].switch_toggled then
     local fx, fy = GetFullForward(x, y, dir)
-    SignalMechanical(fx, fy, (dir+2)%4)
+    Mechanical.sendSignal(fx, fy, (dir+2)%4)
   end
 end
 
@@ -1857,7 +1875,7 @@ local function update(id, x, y, dir)
   elseif id == ids.g_not then
     DoLogicGate(x, y, dir, "not")
   elseif id == ids.mech_gen then
-    SignalMechanical(x, y)
+    Mechanical.sendSignal(x, y)
   elseif id == ids.piston then
     DoPiston(x, y, dir)
   elseif id == ids.stickyPiston then
@@ -1866,7 +1884,7 @@ local function update(id, x, y, dir)
     DoTrashMover(x, y, dir)
   elseif id == ids.enemyMover then
     DoEnemyMover(x, y, dir)
-  elseif id == ids.wire and isMechOn(x, y) then
+  elseif id == ids.wire and Mechanical.isOn(x, y) then
     cells[y][x].testvar = cells[y][x].mech_signal
   elseif id == ids.gen4 then
     Do4Gen(x, y)
@@ -1898,11 +1916,11 @@ local function update(id, x, y, dir)
   elseif id == ids.cross_supgen then
     DoSuperGenerator(x, y, dir)
     DoSuperGenerator(x, y, (dir-1)%4)
-  elseif id == ids.wireless_sender and isMechOn(x, y) then
+  elseif id == ids.wireless_sender and Mechanical.isOn(x, y) then
     DoWirelessSender(x, y, dir)
   elseif id == ids.clockgen then
     if tickCount % 3 == 0 then
-      SignalMechanical(x, y)
+      Mechanical.sendSignal(x, y)
     end
   elseif id == ids.switch then
     DoSwitch(x, y, dir)
@@ -1922,7 +1940,7 @@ local function update(id, x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
-  if isMechOn(x, y) then
+  if Mechanical.isOn(x, y) then
     cells[y][x].mech_signal = cells[y][x].mech_signal - 1
   end
 end
@@ -1933,7 +1951,7 @@ local function isCrosswireOn(x, y, dir)
   if cells[fy][fx].ctype == ids.crosswire then
     return isCrosswireOn(fx, fy, dir)
   else
-    return isMechOn(fx, fy)
+    return Mechanical.isOn(fx, fy)
   end
 end
 
@@ -1946,20 +1964,20 @@ local function onCellDraw(id, x, y, rot)
       love.graphics.draw(wireArm.tex, spos.x, spos.y, r*half_pi, zoom/wireArm.size.w, zoom/wireArm.size.h, wireArm.size.w2, wireArm.size.h2)
     end
 
-    if isConnectable(cells[y][x+1], 0) then
+    if Mechanical.isConnectable(cells[y][x+1], 0) then
       renderArm(0)
     end
-    if isConnectable(cells[y][x-1], 2) then
+    if Mechanical.isConnectable(cells[y][x-1], 2) then
       renderArm(2)
     end
-    if isConnectable(cells[y+1][x], 1) then
+    if Mechanical.isConnectable(cells[y+1][x], 1) then
       renderArm(1)
     end
-    if isConnectable(cells[y-1][x], 3) then
+    if Mechanical.isConnectable(cells[y-1][x], 3) then
       renderArm(3)
     end
 
-    if isMechOn(x, y) then
+    if Mechanical.isOn(x, y) then
       love.graphics.draw(wireActive.tex, spos.x, spos.y, rrot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
     end
   elseif id == ids.crosswire then
@@ -1980,7 +1998,7 @@ local function onCellDraw(id, x, y, rot)
     for dir=0, 3 do
       dir = (cells[y][x].rot + dir) % 4
       local ox, oy = GetFullForward(x, y, dir)
-      if isConnectable(cells[oy][ox], dir) then
+      if Mechanical.isConnectable(cells[oy][ox], dir) then
         renderArm(dir)
       end
 
@@ -1996,11 +2014,11 @@ local function onCellDraw(id, x, y, rot)
     -- if isMechOn(x, y) then
     --   love.graphics.draw(wireActive.tex, spos.x, spos.y, rrot*half_pi, zoom/wireActive.size.w, zoom/wireActive.size.h, wireActive.size.w2, wireActive.size.h2)
     -- end
-  elseif id == ids.piston and isMechOn(x, y) then
+  elseif id == ids.piston and Mechanical.isOn(x, y) then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
     love.graphics.draw(pistonOn.tex, spos.x, spos.y, rrot*half_pi, zoom/pistonOn.size.w, zoom/pistonOn.size.h, pistonOn.size.w2, pistonOn.size.h2)
-  elseif id == ids.stickyPiston and isMechOn(x, y) then
+  elseif id == ids.stickyPiston and Mechanical.isOn(x, y) then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
 
     love.graphics.draw(stickyPistonOn.tex, spos.x, spos.y, rrot*half_pi, zoom/stickyPistonOn.size.w, zoom/stickyPistonOn.size.h, stickyPistonOn.size.w2, stickyPistonOn.size.h2)
@@ -2213,7 +2231,7 @@ local function DoDeathGen(x, y)
       local dist2 = (ox * ox + oy * oy)
       if dist2 < (range * range) then -- Fast distance calculation boiii
         if inGrid(x+ox, y+oy) and cells[y+oy][x+ox].ctype == ids.deathSensor then
-          SignalMechanical(x+ox, y+oy, nil, true)
+          Mechanical.sendSignal(x+ox, y+oy, nil, true)
         end
       end
     end
