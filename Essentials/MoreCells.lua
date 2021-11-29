@@ -1,3 +1,24 @@
+local http = require("socket.http")
+local ltn12 = require("ltn12")
+local json = require("libs.json")
+
+http.TIMEOUT = nil
+
+local function request(method, headers)
+  local resp = {}
+
+  http.request{
+    url = "http://localhost:3000/",
+    sink = ltn12.sink.table(resp),
+    method = method,
+    headers = headers,
+    redirect = true,
+    timeout = 5000000,
+  }
+
+  return resp[1]
+end
+
 local ids = {}
 
 local texp = "MoreCells/"
@@ -975,6 +996,7 @@ local function onlypullSide2(x, y, rot, px, py, prot, ptype)
 end
 
 local function init()
+
   local placeholder = "textures/push.png"
 
   -- Gens
@@ -1047,6 +1069,7 @@ local function init()
   ids.hauler = addCell("EMC hauler", texp .. "movers/grabbers/hauler.png", Options.mover)
   ids.lifter = addCell("EMC lifter", texp .. "movers/grabbers/lifter.png", Options.mover)
   ids.crosspulser = addCell("EMC crosspulser", texp .. "movers/crosspulser.png", {static = true})
+  ids.network_interactive = addCell("EMC network-interactive", texp .. "exotic/network_interactive.png", Options.mover)
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1175,6 +1198,7 @@ local function init()
     uniqueCat:AddItem("Portal A", "When something falls in, it gets sent to the nearest portal B", ids.portal_a)
     uniqueCat:AddItem("Portal B", "When something falls in, it gets sent to the nearest portal A", ids.portal_b)
     uniqueCat:AddItem("Matter Converter", "Converts the cell behind it to a matter blob", ids.matterConverter)
+    uniqueCat:AddItem("Network Interactive Cell", "This cell communicates with the server at http://localhost:3000/\nWarning: using this cell while the server does not respond could crash your game. Thinks like a turtle", ids.network_interactive)
     --uniqueCat:AddItem("Matter Blob", "", ids.matterBlob)
 
     local pushCat = Toolbar:GetCategory("Pushes")
@@ -1514,7 +1538,7 @@ end
 local function DoMatterConverter(x, y, dir)
   local bx, by = GetFullForward(x, y, dir, -1)
 
-  if cells[by][bx].ctype ~= 0 then
+  if inGrid(bx, by) and cells[by][bx].ctype ~= 0 then
     if PushCell(x, y, dir, true, 1, ids.matterBlob, dir) then
       local fx, fy = GetFullForward(x, y, dir)
       cells[fy][fx].matter_stored_cell = CopyTable(cells[by][bx])
@@ -1619,12 +1643,13 @@ local function DoBlackhole(x, y)
     for ox=-range, range do
       if math.sqrt(ox * ox + oy * oy) <= range and not (ox == 0 and oy == 0) then
         local cx, cy = math.floor(x + ox), math.floor(y + oy)
-
-        cells[cy][cx] = {
-          ctype = 0,
-          rot = 0,
-          lastvars = {cx, cy, 0}
-        }
+        if inGrid(cx, cy) then
+          cells[cy][cx] = {
+            ctype = 0,
+            rot = 0,
+            lastvars = {cx, cy, 0}
+          }
+        end
       end
     end
   end
@@ -1826,6 +1851,55 @@ local function DoGraviton(x, y, mass)
   end
 end
 
+local function sleep (a) 
+  local sec = tonumber(os.clock() + a); 
+  while (os.clock() < sec) do 
+  end 
+end
+
+
+-- HTTP request time
+local function DoNetworkInteractive(id, x, y, dir)
+  local data = {}
+  data.tick_count = tickCount
+  data.currentPosition = {
+    x = x,
+    y = y,
+  }
+  data.self = cells[y][x]
+  data.neighbor = {}
+
+  for cy=y-2,y+2 do
+    table.insert(data.neighbor, {})
+    for cx=x-2,x+2 do
+      table.insert(data.neighbor, cells[cy][cx])
+    end
+  end
+
+  --sleep(5)
+
+  local response = request("GET", {
+    cell_info = json.encode(data),
+  })
+  if not response then return end
+  local output = json.decode(response)
+
+  dir = output.move or cells[y][x].rot
+  if output.doRotate then
+    cells[y][x].rot = (dir or cells[y][x].rot)
+  end
+  local moveType = output.type
+  if moveType == "mover" then
+    DoMover(x, y, dir)
+  elseif moveType == "puller" then
+    DoPuller(x, y, dir)
+  elseif moveType == "advancer" then
+    DoAdvancer(id, x, y, dir)
+  elseif moveType == "driller" then
+    DoDriller(id, x, y, dir)
+  end
+end
+
 local function update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
@@ -1917,8 +1991,12 @@ local function update(id, x, y, dir)
 
     for _, pdir in ipairs({(dir+1)%4, (dir+2)%4}) do
       local ox, oy = GetFullForward(x, y, pdir, 2)
-      PullCell(ox, oy, (pdir+2)%4, false, 1)
+      if inGrid(ox, oy) then
+        PullCell(ox, oy, (pdir+2)%4, false, 1)
+      end
     end
+  elseif id == ids.network_interactive then
+    DoNetworkInteractive(id, x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
