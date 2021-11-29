@@ -15,4 +15,5 @@ music.wav
 .vscode/*
 test/*
 test
+test.lua
 Essentials/Resources/*
