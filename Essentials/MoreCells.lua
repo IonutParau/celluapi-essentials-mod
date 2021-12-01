@@ -398,6 +398,8 @@ local wireActive = makeTex(texp .. "wire/on.png")
 local pistonOn = makeTex(texp .. "piston/on.png")
 local stickyPistonOn = makeTex(texp .. "piston/sticky-on.png")
 
+local fireTex = makeTex(texp .. "exotic/fire.png")
+
 ---@param dir number
 ---@param amount number
 local function GetForward(dir, amount)
@@ -468,7 +470,7 @@ function Mechanical.isConnectable(cell, dir)
       return true
     end
 
-    if (id == ids.motionSensor) or (id == ids.piston) or (id == ids.stickyPiston) or (id == ids.movementSensor) then
+    if (id == ids.motionSensor) or (id == ids.piston) or (id == ids.stickyPiston) or (id == ids.movementSensor) or (id == ids.mechSensor) then
       return rdir ~= 2
     end
 
@@ -1013,6 +1015,35 @@ local function onlypullSide2(x, y, rot, px, py, prot, ptype)
   end
 end
 
+local function burnAlive()
+  for y=1,height-1 do
+    for x=1,width-1 do
+      if cells[y][x].on_fire then
+        cells[y][x] = {
+          ctype = 0,
+          rot = 0,
+          lastvars = {x, y, 0},
+          testvar = "Burned",
+        }
+        for i=0,3 do
+          local ox, oy = GetFullForward(x, y, i)
+          if inGrid(ox, oy) and cells[oy][ox].ctype ~= 0 then
+            cells[oy][ox].will_burn = true
+          end
+        end
+      end
+    end
+  end
+  for y=1,height-1 do
+    for x=1,width-1 do
+      if cells[y][x].will_burn then
+        cells[y][x].will_burn = nil
+        cells[y][x].on_fire = true
+      end
+    end
+  end
+end
+
 local function init()
 
   local placeholder = "textures/push.png"
@@ -1022,6 +1053,7 @@ local function init()
   ids.delayer = addCell("EMC mech motion-sensor", texp .. "delayer.png", {updateindex = 2})
   ids.wire = addCell("EMC mech wire", texp .. "wire/off.png", {updateindex = 3})
   ids.mech_gen = addCell("EMC mech mech_gen", texp .. "mech_gen.png", {updateindex = 4})
+  ids.mechSensor = addCell("EMC mech sensor", texp .. "motionSensor.png", {updateindex = 5})
   --ids.movementSensor = addCell("EMC mech move-sensor", placeholder, {updateindex = 5})
   -- Users
   ids.activator = addCell("EMC mech activator", texp .. "activator.png", Options.neverupdate)
@@ -1088,6 +1120,7 @@ local function init()
   ids.lifter = addCell("EMC lifter", texp .. "movers/grabbers/lifter.png", Options.mover)
   ids.crosspulser = addCell("EMC crosspulser", texp .. "movers/crosspulser.png", {static = true})
   ids.network_interactive = addCell("EMC network-interactive", texp .. "exotic/network_interactive.png", Options.mover)
+  ids.fire = addCell("EMC fire", texp .. "exotic/fire.png", {static = true})
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1133,10 +1166,15 @@ local function init()
 
   ids.silentTrash = addCell("EMC silent-trash", texp .. "silentTrash.png", Options.combine(Options.trash, Options.neverupdate, {silent = true}))
 
+
+
+  table.insert(subticks, burnAlive)
+
   if Toolbar then
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
 
     mechCat:AddItem("Motion Sensor", "Senses motion. If it detects motion, it outputs a mechanical signal", ids.motionSensor)
+    mechCat:AddItem("Sensor", "If it sees a cell in front of it, it outputs a mechanical signal", ids.mechSensor)
     --mechCat:AddItem("Movement Sensor", "If moved, it outputs a mechanical signal", ids.movementSensor)
     mechCat:AddItem("Wire", "Extends mechanical signals further", ids.wire)
     mechCat:AddItem("CrossWire", "Acts as a wire while keeping 2 signals seperated", ids.crosswire)
@@ -1179,6 +1217,7 @@ local function init()
     destCat:AddItem("Ghost Trash", "Trash cell that can't be generated", ids.ghostTrash)
     destCat:AddItem("Nuclear Bomb", "One of, if not THE most powerful bomb in modded CelLua history", ids.nuclearBomb)
     destCat:AddItem("Black hole", "Destroys all cells that move inside it. Nobody knows what's inside.", ids.blackhole)
+    destCat:AddItem("Fire", "Burns cells around it", ids.fire)
 
     local movCat = Toolbar:GetCategory("Movers")
     movCat:AddItem("Super Impulser", "Impulser, but pulls 1 tile from basically infinite tiles orthogonally away", ids.superimpulser)
@@ -2015,6 +2054,14 @@ local function update(id, x, y, dir)
     end
   elseif id == ids.network_interactive then
     DoNetworkInteractive(id, x, y, dir)
+  elseif id == ids.mechSensor then
+    local fx, fy = GetFullForward(x, y, dir)
+
+    if cells[fy][fx].ctype ~= 0 then
+      Mechanical.sendSignal(x, y, dir)
+    end
+  elseif id == ids.fire then
+    cells[y][x].on_fire = true
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -2035,6 +2082,12 @@ end
 
 local function onCellDraw(id, x, y, rot)
   local rrot = LerpRotation((cells[y][x].lastvars or {x, y, rot})[3], rot)
+
+  if cells[y][x].on_fire then
+    local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)
+
+    love.graphics.draw(fireTex.tex, spos.x, spos.y, rrot, zoom/fireTex.size.w, zoom/fireTex.size.h, fireTex.size.w2, fireTex.size.h2)
+  end
 
   if id == ids.wire then
     local spos = calculateScreenPosition(x, y, cells[y][x].lastvars)

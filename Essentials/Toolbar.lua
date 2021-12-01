@@ -480,6 +480,10 @@ end
 function DoToolbarUpdate()
   if type(currentstate) == "string" then
     placecells = false
+
+    if currentstate:sub(1, #"Essentials/Component Icons/") == "Essentials/Component Icons/" then
+      currentstate = pastcurrentstate
+    end
   end
 
   if tools["tool-auto-protect"] then
@@ -804,6 +808,16 @@ for _, data in ipairs(toolData) do
       h2 = img:getHeight()/2,
     }
   end
+end
+
+if IsEssentials and HasSecretKey("idk-components") then
+  local refCat = Toolbar:AddCategory("Components", "Information about the components in Essentials", "Essentials/MoreCells/base.png")
+  local ecitexp = "Essentials/Component Icons/"
+  refCat:AddCategory("Toolbar", "It modifies the cell bar to make it more organised and nicer", ecitexp .. "Toolbar.png")
+  refCat:AddCategory("Resourcer", "Enables custom resource packs that can have animations, overrides, overlays, modifications of audio, modifications of the icon, etc. It can even work with modifying modded textures / audio!", ecitexp .. "Resourcer.png")
+  refCat:AddCategory("MoreUI", "An internal tool mods can use to make UIs easier", ecitexp .. "MoreUI.png")
+  refCat:AddCategory("MoreCells", "Adds more cells to the game. They are most of the time useful cells, and other times cells added for fun", ecitexp .. "MoreCells.png")
+  refCat:AddCategory("BestSave", "When you press the save button, it runs all the installed saving formats to find out which one is the best one. It then gives you the level string with the best one", ecitexp .. "BestSave.png")
 end
 
 local arial = love.graphics.newFont(fontp, 16)

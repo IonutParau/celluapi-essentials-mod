@@ -11,5 +11,6 @@
   "resourcer_overlay_transparency": true,
   "disable_music": false,
   "player_lock": true,
-  "graviton_mass": 1
+  "graviton_mass": 1,
+  "secret_keys": []
 }

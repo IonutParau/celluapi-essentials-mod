@@ -41,6 +41,15 @@ end
 
 local componentPics = {}
 
+function HasSecretKey(skey)
+  for _, key in ipairs(econfig['secret_keys'] or {}) do
+    if key == skey then
+      return true
+    end
+  end
+  return false
+end
+
 for _, component in ipairs(econfig['components']) do
   Ereturns[component] = require("Essentials/" .. component)
   local icon = MakeTexture("Essentials/Component Icons/" .. component .. ".png", component)
@@ -87,8 +96,68 @@ local function init()
   end
 end
 
+local firstLoad = true
+
 local function customupdate(dt)
-  if Keybind then Keybind.CancelNormal(true) end
+  --if Keybind then Keybind.CancelNormal(true) end
+  if firstLoad then
+    firstLoad = false
+
+    -- Do stuff on first load
+    if HasSecretKey("flip-screen") then
+      -- Apply flipping effect
+      local d = love.draw
+      love.draw = function()
+        local w = love.graphics.getWidth()
+        local h = love.graphics.getHeight()
+        love.graphics.translate(w/2, h/2)
+        love.graphics.rotate(HALF_PI*2)
+        love.graphics.translate(-w/2, -h/2)
+        d()
+      end
+
+      -- local m = love.mousepressed
+
+      -- love.mousepressed = function(x, y, button, presses, tap)
+      --   local w = love.graphics.getWidth()
+      --   local h = love.graphics.getHeight()
+      --   local ox = w/2
+      --   local oy = h/2
+      --   local dir = math.atan2(oy - y, ox - x) + math.pi
+      --   local mag = math.sqrt((ox - x) ^ 2 + (oy - y) ^ 2)
+      --   x = math.cos(dir) * mag + ox
+      --   y = math.sin(dir) * mag + oy
+      --   m(x, y, button, presses, tap)
+      -- end
+
+      -- local orgetx = love.mouse.getX
+      -- local orgety = love.mouse.getY
+
+      -- love.mouse.getX = function()
+      --   local x, y = orgetx(), orgety()
+      --   local w = love.graphics.getWidth()
+      --   local h = love.graphics.getHeight()
+      --   local ox = w/2
+      --   local oy = h/2
+      --   local dir = math.atan2(y - oy, x - ox) + math.pi
+      --   local mag = math.sqrt((x - ox) ^ 2 + (y - oy) ^ 2)
+      --   x = math.cos(dir) * mag
+      --   return x + ox
+      -- end
+
+      -- love.mouse.getY = function()
+      --   local x, y = orgetx(), orgety()
+      --   local w = love.graphics.getWidth()
+      --   local h = love.graphics.getHeight()
+      --   local ox = w/2
+      --   local oy = h/2
+      --   local dir = math.atan2(oy - y, ox - x) + math.pi
+      --   local mag = math.sqrt((ox - x) ^ 2 + (oy - y) ^ 2)
+      --   y = math.sin(dir) * mag
+      --   return y + oy
+      -- end
+    end
+  end
   if Toolbar then DoToolbarUpdate() end
   if Resourcer then
     if not loadedResourcer then
