@@ -2622,7 +2622,9 @@ local function onMove(id, x, y, rot, dir, force)
   end
 
   if id == ids.sync then
-    if shouldSync == true and not (cells[y][x].dontSync) then
+    local ods = cells[y][x].dontSync
+    cells[y][x].dontSync = true
+    if shouldSync == true and not (ods) then
       shouldSync = false
 
       local syncs = {}
@@ -2632,9 +2634,7 @@ local function onMove(id, x, y, rot, dir, force)
           if cells[cy][cx].ctype == ids.sync and (cx ~= x or cy ~= y) and not (cells[cy][cx].dontSync) then
             cells[cy][cx].dontSync = true
             local bx, by = GetFullForward(cx, cy, dir, -1)
-            if cells[by][bx].ctype ~= ids.sync then
-              MoverAny(ids.sync, cx, cy, dir)
-            end
+            MoverAny(ids.sync, cx, cy, dir)
           end
         end
       end
