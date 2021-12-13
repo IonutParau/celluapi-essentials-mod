@@ -4,6 +4,8 @@ local json = require("libs.json")
 
 http.TIMEOUT = nil
 
+local MoreCells = {}
+
 local function request(method, headers)
   local resp = {}
 
@@ -400,7 +402,7 @@ local wireActive = makeTex(texp .. "wire/on.png")
 local pistonOn = makeTex(texp .. "piston/on.png")
 local stickyPistonOn = makeTex(texp .. "piston/sticky-on.png")
 local takeover_lay = makeTex(texp .. "exotic/takeover_lay.png")
-
+local pixel_on = makeTex(texp .. "mech/pixel_on.png")
 local fireTex = makeTex(texp .. "exotic/fire.png")
 
 ---@param dir number
@@ -516,7 +518,7 @@ function Mechanical.isConnectable(cell, dir)
   end
 
   if isMech(id) then
-    if id == ids.wire or id == ids.activator or id == ids.mech_gen or id == ids.clockgen then
+    if id == ids.wire or id == ids.activator or id == ids.mech_gen or id == ids.clockgen or id == ids.pixel then
       return true
     end
 
@@ -793,23 +795,27 @@ local function canPush(fx, fy, dir)
   return true
 end
 
-local function FakeMoveForward(x, y, dir, replacetype, replacerot)
+local function FakeMoveForward(x, y, dir, replacetype, replacerot, handleDivergers)
   replacetype = replacetype or 0
   replacerot = replacerot or 0
+  if handleDivergers == nil then handelDivergers = true end
   local fx, fy = GetFullForward(x, y, dir)
 
   local us = CopyTable(cells[y][x])
 
   cells[y][x] = {
     ctype = replacetype,
-    rot = replacerot
+    rot = replacerot,
+    lastvars = {x, y, replacerot},
+    testvar = "",
   }
-
-  local f = walkDivergedPath(x, y, fx, fy)
-  fx = f.x
-  fy = f.y
-  local addedRot = (f.dir - dir) % 4
-  us.rot = (addedRot + us.rot) % 4
+  if handleDivergers then
+    local f = walkDivergedPath(x, y, fx, fy)
+    fx = f.x
+    fy = f.y
+    local addedRot = (f.dir - dir) % 4
+    us.rot = (addedRot + us.rot) % 4
+  end
   cells[fy][fx] = us
   SetChunk(fx, fy, us.ctype)
 end
@@ -1213,14 +1219,14 @@ local function rotateSync(amount)
   end
 end
 
-local function init()
+function MoreCells.init()
 
   local placeholder = "textures/push.png"
 
   -- Gens
   ids.motionSensor = addCell("EMC mech motion-sensor", texp .. "motionSensor.png", {updateindex = 1})
   ids.delayer = addCell("EMC mech motion-sensor", texp .. "delayer.png", {updateindex = 2})
-  ids.wire = addCell("EMC mech wire", texp .. "wire/off.png", {updateindex = 3})
+  ids.wire = addCell("EMC mech wire", texp .. "wire/off.png", {updateindex = 3, static = true})
   ids.mech_gen = addCell("EMC mech mech_gen", texp .. "mech_gen.png", {updateindex = 4})
   ids.mechSensor = addCell("EMC mech sensor", texp .. "motionSensor.png", {updateindex = 5})
   --ids.movementSensor = addCell("EMC mech move-sensor", placeholder, {updateindex = 5})
@@ -1264,9 +1270,9 @@ local function init()
   ids.cross_supgen = addCell("EMC cross-supgen", texp .. "generators/cross_supgen.png")
 
   local weights = {}
-  weights.twice = addCell("EMC weight-2", texp .. "weight/2.png", {weight = 2})
-  weights.three = addCell("EMC weight-3", texp .. "weight/3.png", {weight = 3})
-  weights.four = addCell("EMC weight-4", texp .. "weight/4.png", {weight = 4})
+  weights.twice = addCell("EMC weight-2", texp .. "weight/2.png", {weight = 2, dontupdate = true})
+  weights.three = addCell("EMC weight-3", texp .. "weight/3.png", {weight = 3, dontupdate = true})
+  weights.four = addCell("EMC weight-4", texp .. "weight/4.png", {weight = 4, dontupdate = true})
 
   ids.fan = addCell("EMC fan", texp .. "movers/fans/fan.png")
   ids.strongfan = addCell("EMC strong-fan", texp .. "movers/fans/strongfan.png")
@@ -1279,10 +1285,9 @@ local function init()
   ids.matterBlob = addCell("EMC matter blob", texp .. "matter/blob.png", Options.combine(Options.mover, Options.invisible))
   ids.matterConverter = addCell("EMC matter converter", texp .. "matter/converter.png")
   ids.nuclearBomb = addCell("EMC nuclear bomb", texp .. "nuclear_bomb.png", {type="enemy", dontupdate = true})
-  ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1}))
+  ids.blackhole = addCell("EMC blackhole", texp .. "blackhole.png", Options.combine(Options.unpushable, Options.ungenable, {updateindex = 1, static = true}))
   ids.superimpulser = addCell("EMC super-impulser", texp .. "superimpulser.png", {static = true})
-  ids.graviton = addCell("EMC graviton", texp .. "movers/graviton.png")
-  ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
+  ids.graviton = addCell("EMC graviton", texp .. "movers/graviton.png", {static = true})
   ids.grabber = addCell("EMC grabber", texp .. "movers/grabbers/grabber.png", Options.mover)
   ids.transporter = addCell("EMC transporter", texp .. "movers/grabbers/transporter.png", Options.mover)
   ids.hauler = addCell("EMC hauler", texp .. "movers/grabbers/hauler.png", Options.mover)
@@ -1290,7 +1295,7 @@ local function init()
   ids.crosspulser = addCell("EMC crosspulser", texp .. "movers/crosspulser.png", {static = true})
   ids.network_interactive = addCell("EMC network-interactive", texp .. "exotic/network_interactive.png", Options.mover)
   ids.fire = addCell("EMC fire", texp .. "exotic/fire.png", {static = true})
-  ids.computer = addCell("EMC computer", texp .. "computer.png")
+  --ids.computer = addCell("EMC computer", texp .. "computer.png")
   ToggleFreezability(ids.player)
 
   addFlipperTranslation(ids.monitor, ids.musical, false)
@@ -1322,7 +1327,7 @@ local function init()
   --   return ((dir+2)%4 == cells[y][x].rot)
   -- end)
 
-  ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash))
+  ids.ghostTrash = addCell("EMC ghost_trash", texp .. "ghost_trash.png", Options.combine(Options.ungenable, Options.trash, Options.neverupdate))
 
   ids.forward_left_forker = addCell("EMC forward-right-forker", texp .. "forkers/sided_forker.png", {type="sidetrash", dontupdate = true, silent = true})
   ids.forward_right_forker = addCell("EMC forward-left-forker", texp .. "forkers/opposite_sided_forward.png", {type="sidetrash", dontupdate = true, silent = true})
@@ -1336,7 +1341,7 @@ local function init()
 
   ids.silentTrash = addCell("EMC silent-trash", texp .. "silentTrash.png", Options.combine(Options.trash, Options.neverupdate, {silent = true}))
 
-  ids.unstoppableMover = addCell("EMC nostop-move", texp .. "movers/unstoppable/mover.png", Options.mover)
+  --ids.unstoppableMover = addCell("EMC nostop-move", texp .. "movers/unstoppable/mover.png", Options.mover)
 
   table.insert(subticks, burnAlive)
 
@@ -1345,6 +1350,12 @@ local function init()
   table.insert(subticks, 1, takeovers)
 
   ids.sync = addCell("EMC sync-cell", texp .. "exotic/sync.png", {static = true})
+
+  ids.shovel = addCell("EMC shovel", texp .. "movers/shovel.png")
+
+  ids.bringer = addCell("EMC bringer", texp .. "movers/bringer.png", {type="mover"})
+
+  ids.pixel = addCell("EMC mech pixel", texp .. "mech/pixel.png", {static = true})
 
   if Toolbar then
     local mechCat = Toolbar:AddCategory("Mechanical Cells", "Cells that use mechanical systems", texp .. "wire/on.png")
@@ -1382,6 +1393,7 @@ local function init()
     mechCat:AddItem("Wireless Receiver", "Receives a wireless signal", ids.wireless_receiver)
     mechCat:AddItem("Clock Generator", "A slower generator. Generates a signal every 3 ticks", ids.clockgen)
     mechCat:AddItem("Switch", "When it is powered, it will toggle itself. It's output is whether it is toggled.", ids.switch)
+    mechCat:AddItem("Pixel", "Black when off, white when on", ids.pixel)
 
     local destCat = Toolbar:GetCategory("Destroyers")
     destCat:AddItem("Stronger Enemy", "When it gets destroyed it turns into a strong enemy. Basically a enemy with 3 hp", ids.strongerenemy)
@@ -1401,7 +1413,7 @@ local function init()
     movCat:AddItem("Unstoppable Mover", "Mover that can even move unmovable stuff", ids.unstoppableMover)
     movCat:AddItem("Trash-Mover", "Trash cell moving on the grid. Complete total meme", ids.trashMover)
     movCat:AddItem("Slide Opener", "A mover that, when pushing sliders, can only push them on the wrong sides.", ids.slideopener)
-    
+
     local fanCat = movCat:AddCategory("Fans", "Pushes cells out of its range", texp .. "movers/fans/fan.png")
     fanCat:AddItem("Fan", "Only pushes cells directly in front of it", ids.fan)
     fanCat:AddItem("Super Fan", "Has a range of 2 tiles", ids.strongfan)
@@ -1415,7 +1427,9 @@ local function init()
     movCat:AddItem("Hauler", "Grabber and Mover combined", ids.hauler)
     movCat:AddItem("Lifter", "Grabber, Mover and Puller combined", ids.lifter)
     movCat:AddItem("Takeover", "Tries to move, and if it sees something in front, takes over it", ids.takeover)
-    movCat:AddItem("Sync", "Syncronize!!!", ids.sync)
+    movCat:AddItem("Sync", "When rotated, all other sync cells are rotated by the same amount. When moved, all other sync cells are moved i nthe same direction.", ids.sync)
+    movCat:AddItem("Shovel", "Driller that sends cells to its sides.", ids.shovel)
+    movCat:AddItem("Bringer", "Mover but puts what is behind it in front of it", ids.bringer)
 
     local genCat = Toolbar:GetCategory("Generators")
     genCat:AddItem("4-way Generator", "Generates stuff from the opposite sides just because.", ids.gen4)
@@ -1435,7 +1449,7 @@ local function init()
     uniqueCat:AddItem("Portal B", "When something falls in, it gets sent to the nearest portal A", ids.portal_b)
     uniqueCat:AddItem("Matter Converter", "Converts the cell behind it to a matter blob", ids.matterConverter)
     uniqueCat:AddItem("Network Interactive Cell", "This cell communicates with the server at http://localhost:3000/\nWarning: using this cell while the server does not respond could crash your game. Thinks like a turtle", ids.network_interactive)
-    uniqueCat:AddItem("Computer", "COMPUTE", ids.computer)
+    --uniqueCat:AddItem("Computer", "COMPUTE", ids.computer)
 
     local pushCat = Toolbar:GetCategory("Pushes")
     pushCat:AddItem("Unpullable", "It can only be pushed. Never pulled", nopullID)
@@ -1874,17 +1888,22 @@ local function DoNuclearBomb(x, y, range)
 end
 
 local function DoBlackhole(x, y)
-  local range = 3
+  cells[y][x].on_fire = nil
+  local range = math.floor(cells[y][x].mass or 3)
   for oy=-range, range do
     for ox=-range, range do
       if math.sqrt(ox * ox + oy * oy) <= range and not (ox == 0 and oy == 0) then
         local cx, cy = math.floor(x + ox), math.floor(y + oy)
         if inGrid(cx, cy) then
-          cells[cy][cx] = {
-            ctype = 0,
-            rot = 0,
-            lastvars = {cx, cy, 0}
-          }
+          local original = cells[cy][cx].ctype
+          if original ~= 0 then
+            cells[cy][cx] = {
+              ctype = 0,
+              rot = 0,
+              lastvars = {cx, cy, 0}
+            }
+            cells[y][x].mass = (cells[y][x].mass or range) + ((0.3 / range) ^ 2)
+          end
         end
       end
     end
@@ -2132,11 +2151,68 @@ local function DoNetworkInteractive(id, x, y, dir)
   elseif moveType == "advancer" then
     DoAdvancer(id, x, y, dir)
   elseif moveType == "driller" then
-    DoDriller(id, x, y, dir)
+    DoDriller(id, x, y)
   end
 end
 
-local function update(id, x, y, dir)
+local function DoShovel(x, y, dir)
+  local pattern = (cells[y][x].shovelPattern or 0)
+
+  cells[y][x].shovelPattern = (pattern + 1) % 2
+
+  if canPush(x, y, dir) then
+    local x2, y2 = GetFullForward(x, y, dir)
+    if cells[y2][x2].ctype == 11 or cells[y2][x2].ctype == 50 or isModdedTrash(cells[y2][x2].ctype) or (GetSidedTrash(cells[y2][x2].ctype) ~= nil and GetSidedTrash(cells[y2][x2].ctype)(x2, y2, dir) == true) then
+      cells[y][x].ctype = 0
+      if cells[y2][x2].ctype == 50 then
+        if x2 < width-1 and (not cells[y2][x2+1].protected and cells[y2][x2+1].ctype ~= -1 and cells[y2][x2+1].ctype ~= 11 and cells[y2][x2+1].ctype ~= 40 and cells[y2][x2+1].ctype ~= 50) then cells[y2][x2+1].ctype = 0 end
+        if x2 > 0 and (not cells[y2][x2-1].protected and cells[y2][x2-1].ctype ~= -1 and cells[y2][x2-1].ctype ~= 11 and cells[y2][x2-1].ctype ~= 40 and cells[y2][x2-1].ctype ~= 50) then cells[y2][x2-1].ctype = 0 end
+        if y2 < height-1 and (not cells[y2+1][x2].protected and cells[y2+1][x2].ctype ~= -1 and cells[y2+1][x2].ctype ~= 11 and cells[y2+1][x2].ctype ~= 40 and cells[y2+1][x2].ctype ~= 50) then cells[y2+1][x2].ctype = 0 end
+        if y2 > 0 and (not cells[y2-1][x2].protected and cells[y2-1][x2].ctype ~= -1 and cells[y2-1][x2].ctype ~= 11 and cells[y2-1][x2].ctype ~= 40 and cells[y2-1][x2].ctype ~= 50) then cells[y2-1][x2].ctype = 0 end
+      end
+      if isModdedTrash(cells[y2][x2].ctype) or (GetSidedTrash(cells[y2][x2].ctype) ~= nil and GetSidedTrash(cells[y2][x2].ctype)(x2, y2, dir) == true) then
+        modsOnTrashEat(cells[y2][x2].ctype, x2, y2, cells[y][x], x, y)
+      end
+      love.audio.play(destroysound)
+    elseif cells[y2][x2].ctype ~= -1 and cells[y2][x2].ctype ~= 40 then
+      -- Movement time
+      local r = dir
+      if pattern == 0 then r = r + 1 end
+      if pattern == 1 then r = r - 1 end
+      local x3, y3 = GetFullForward(x, y, (dir + r) % 4)
+      cells[y3][x3].testvar = "shovout"
+
+      if cells[y3][x3].ctype == 0 or cells[y2][x2].ctype == 0 then
+        if cells[y2][x2].ctype ~= 0 then
+          local copy = CopyTable(cells[y2][x2])
+          copy.testvar = "shovout"
+          cells[y3][x3] = copy
+        end
+        FakeMoveForward(x, y, dir, 0, 0, false)
+      end
+    end
+  end
+end
+
+local function DoBringer(x, y, rot)
+  local bx, by = GetFullForward(x, y, rot, -1)
+  local fx, fy = GetFullForward(x, y, rot)
+  if cells[by][bx].ctype ~= 0 and cells[fy][fx].ctype == 0 then
+    local copy = CopyTable(cells[by][bx])
+    copy.testvar = "Bringed"
+    cells[fy][fx] = copy
+    cells[by][bx] = {
+      ctype = 0,
+      rot = 0,
+      lastvars = {bx, by, 0},
+      testvar = "",
+    }
+  end
+  
+  DoMover(x, y, rot)
+end
+
+function MoreCells.update(id, x, y, dir)
   -- Some for fun stuff for player :)
 
   if id == ids.monitor then
@@ -2254,6 +2330,10 @@ local function update(id, x, y, dir)
       cells[y][x].dontSync = false
     end
     cells[y][x].lastRot = cells[y][x].rot
+  elseif id == ids.shovel then
+    DoShovel(x, y, dir)
+  elseif id == ids.bringer then
+    DoBringer(x, y, dir)
   end
 
   cells[y][x].prev_mech_signal = cells[y][x].mech_signal -- Useful for later ;)
@@ -2272,7 +2352,7 @@ local function isCrosswireOn(x, y, dir)
   end
 end
 
-local function onCellDraw(id, x, y, rot)
+function MoreCells.onCellDraw(id, x, y, rot)
   local rrot = LerpRotation((cells[y][x].lastvars or {x, y, rot})[3], rot)
 
   if cells[y][x].on_fire then
@@ -2358,7 +2438,7 @@ end
 
 local shouldSync = true
 
-local function tick()
+function MoreCells.tick()
   tickCount = tickCount + 1
   playerPosCache = nil
   rotateSync(syncDeltaRot)
@@ -2416,12 +2496,17 @@ local function tick()
   -- until #stickyQueue == 0
 end
 
-local function onPlace(id, x, y, rot, original, originalInitial)
+function MoreCells.onPlace(id, x, y, rot, original, originalInitial)
   cells[y][x].mech_signal = 0
   cells[y][x].is_hidden_player = false
   cells[y][x].matter_stored_cell = nil
   cells[y][x].computer_imitator = nil
   cells[y][x].isTakeover = false
+
+  if original.ctype == ids.blackhole and id == ids.blackhole then
+    cells[y][x] = original
+    initial[y][x] = originalInitial
+  end
 
   if original.ctype == ids.computer and id ~= ids.computer and id ~= 0 then
     cells[y][x] = original
@@ -2479,20 +2564,7 @@ local function renderOverlayOnCell(overlay, x, y)
   love.graphics.draw(overlay.tex, spos.x, spos.y, rot*HALF_PI, zoom/overlay.size.w, zoom/overlay.size.h, overlay.size.w2, overlay.size.h2)
 end
 
-local function onGridRender()
-  for x=1,width-1 do
-    for y=1,height-1 do
-      local id = cells[y][x].ctype
-      if id == ids.blackhole then
-        local spos = calculateScreenPosition(x, y)
-
-        local r, g, b, a = love.graphics.getColor()
-        love.graphics.setColor(0, 0, 0, 1)
-        love.graphics.circle("fill", spos.x, spos.y, 3.3 * zoom)
-        love.graphics.setColor(r, g, b, a)
-      end
-    end
-  end
+function MoreCells.onGridRender()
   if not (paused) then
     for x=1,width-1 do
       for y=1,height-1 do
@@ -2534,7 +2606,22 @@ local function onGridRender()
           end
         elseif cells[y][x].isTakeover and cells[y][x].ctype ~= ids.takeover then
           renderOverlayOnCell(takeover_lay, x, y)
+        elseif cells[y][x].ctype == ids.pixel and Mechanical.isOn(x, y) then
+          renderOverlayOnCell(pixel_on, x, y)
         end
+      end
+    end
+  end
+  for x=1,width-1 do
+    for y=1,height-1 do
+      local id = cells[y][x].ctype
+      if id == ids.blackhole then
+        local spos = calculateScreenPosition(x, y)
+
+        local r, g, b, a = love.graphics.getColor()
+        love.graphics.setColor(0, 0, 0, 1)
+        love.graphics.circle("fill", spos.x, spos.y, ((cells[y][x].mass or 3) * 1.1) * zoom)
+        love.graphics.setColor(r, g, b, a)
       end
     end
   end
@@ -2584,7 +2671,7 @@ local function DoDeathGen(x, y)
   end
 end
 
-local function onTrashEats(id, x, y, food, fx, fy)
+function MoreCells.onTrashEats(id, x, y, food, fx, fy)
   DoDeathGen(x, y)
 
   if id == ids.forward_right_forker then
@@ -2606,7 +2693,7 @@ local function onTrashEats(id, x, y, food, fx, fy)
   end
 end
 
-local function onEnemyDies(id, x, y, killer, kx, ky)
+function MoreCells.onEnemyDies(id, x, y, killer, kx, ky)
   DoDeathGen(x, y)
   if id == ids.nuclearBomb then
     DoNuclearBomb(x, y)
@@ -2615,7 +2702,7 @@ local function onEnemyDies(id, x, y, killer, kx, ky)
   end
 end
 
-local function onMove(id, x, y, rot, dir, force)
+function MoreCells.onMove(id, x, y, rot, dir, force)
   if id == ids.grabber or id == ids.transporter or id == ids.hauler or id == ids.lifter then
     local bx, by = GetFullForward(x, y, rot, -1)
     DoGrabber(id, bx, by, rot, true)
@@ -2655,7 +2742,7 @@ end
 local playTime = 0
 local loadedPlayerFix = false
 
-local function customupdate(dt)
+function MoreCells.customupdate(dt)
   if not (paused or inmenu) then
     for _, light in ipairs(lights) do
       light.lifetime = light.lifetime - (dt / (math.max(delay, 1 / light.lifespan))) * tpu
@@ -2667,7 +2754,7 @@ local function customupdate(dt)
   end
 end
 
-local function onKeyPressed(key, code, continous)
+function MoreCells.onKeyPressed(key, code, continous)
   -- Do rotation for player
   if not continous then
     if not (inmenu or paused) then
@@ -2704,13 +2791,13 @@ local function onKeyPressed(key, code, continous)
   end
 end
 
-local function onCellGenerated(id, x, y)
+function MoreCells.onCellGenerated(id, x, y)
   if cells[y][x].is_hidden_player then
     cells[y][x].is_hidden_player = false
   end
 end
 
-local function onMouseReleased()
+function MoreCells.onMouseReleased()
   for cy=1, height-1 do
     for cx=1, width-1 do
       cells[cy][cx].musical_last_played = nil
@@ -2738,19 +2825,4 @@ end
 -- 	end
 -- end
 
-return {
-  init = init,
-  update = update,
-  tick = tick,
-  onCellDraw = onCellDraw,
-  onPlace = onPlace,
-  onTrashEats = onTrashEats,
-  onEnemyDies = onEnemyDies,
-  onMove = onMove,
-  onKeyPressed = onKeyPressed,
-  onGridRender = onGridRender,
-  customupdate = customupdate,
-  onCellGenerated = onCellGenerated,
-  onMouseReleased = onMouseReleased,
-  onMouseScroll = onMouseScroll,
-}
+return MoreCells

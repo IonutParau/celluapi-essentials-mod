@@ -39,6 +39,8 @@ function MakeTexture(texture, display)
   }
 end
 
+local deleteTex = MakeTexture("textures/menu.png")
+
 local componentPics = {}
 
 function HasSecretKey(skey)
@@ -215,6 +217,13 @@ local function customdraw()
     love.graphics.print("Essentials", 155*winxm, 105*winym, -math.pi*0.125, winxm + s, winym + s, w /2 * (winxm + s), h / 2 * (winym + s))
     love.graphics.setColor(r, g, b, a)
   end
+  local red, green, blue, alpha = love.graphics.getColor()
+  
+  love.graphics.setColor(1, 1, 1, 0.5)
+  -- if selecting then
+  --   love.graphics.draw(deleteTex.tex,250*winxm,25*winym+75*winxm,0,60*winxm/deleteTex.size.w,60*winxm/deleteTex.size.h)
+  -- end
+  love.graphics.setColor(red, green, blue, alpha)
 end
 
 local function onCellDraw(id, x, y, rot)
@@ -228,6 +237,26 @@ local function onMousePressed(x, y)
     ToolbarClickTools("press", x, y)
   end
   runCustomComponentCallback("click", "press", x, y)
+  -- local px, py = x * winxm, y * winym
+  -- if selecting and ((x > 250) and (x < 310) and (py > (25*winym + 75*winxm)) and (py < (25*winym + 135*winxm))) then
+  --   for ox=0, selx do
+  --     for oy = 0, sely do
+  --       local cx, cy = selx + ox - 1, sely + oy - 1
+  --       if cx > 0 and cx < width-1 and cy > 0 and cy < height-1 then
+  --         undocells[cy][cx] = CopyTable(cells[cy][cx])
+  --         undocells[cy][cx].place = placeables[cy][cx]
+  --         cells[cy][cx] = {
+  --           ctype = 0,
+  --           rot = 0,
+  --           lastvars = {cx, cy, 0},
+  --           testvar = "",
+  --         }
+  --       end
+  --     end
+  --   end
+  --   placecells = false
+  --   selecting = false
+  -- end 
 end
 
 local function onMouseReleased(x, y)
